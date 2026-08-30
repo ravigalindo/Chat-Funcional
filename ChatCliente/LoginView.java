@@ -15,17 +15,19 @@ public class LoginView {
     private final Stage stage;
     private final ChatClienteApp aplicativo;
     private final GerenciadorUsuarios gerenciadorUsuarios;
+    private final Sessao sessao;
 
     public LoginView(
-        Stage stage,
-        ChatClienteApp aplicativo,
-        GerenciadorUsuarios gerenciadorUsuarios
-) {
-    this.stage = stage;
-    this.aplicativo = aplicativo;
-    this.gerenciadorUsuarios =
-            gerenciadorUsuarios;
-}
+            Stage stage,
+            ChatClienteApp aplicativo,
+            GerenciadorUsuarios gerenciadorUsuarios,
+            Sessao sessao
+    ) {
+        this.stage = stage;
+        this.aplicativo = aplicativo;
+        this.gerenciadorUsuarios = gerenciadorUsuarios;
+        this.sessao = sessao;
+    }
 
     public void mostrar() {
 
@@ -60,12 +62,16 @@ public class LoginView {
         PasswordField campoSenha =
                 new PasswordField();
 
-        Label mensagemStatus =
-                new Label();
-
         campoSenha.setPromptText(
                 "Digite sua senha"
         );
+
+        // ==========================================
+        // MENSAGEM DE STATUS
+        // ==========================================
+
+        Label mensagemStatus =
+                new Label();
 
         // ==========================================
         // BOTÃO ENTRAR
@@ -77,28 +83,31 @@ public class LoginView {
         botaoEntrar.setOnAction(event -> {
 
             String usuario =
-            campoUsuario.getText().trim();
+                    campoUsuario.getText().trim();
 
-    String senha =
-            campoSenha.getText();
+            String senha =
+                    campoSenha.getText();
 
-    boolean autenticado =
-            gerenciadorUsuarios.autenticar(
-                    usuario,
-                    senha
-            );
+            Usuario usuarioAutenticado =
+                    gerenciadorUsuarios.obterUsuarioAutenticado(
+                            usuario,
+                            senha
+                    );
 
-    if (autenticado) {
+            if (usuarioAutenticado != null) {
 
-        aplicativo.mostrarChat(stage);
+                sessao.iniciarSessao(
+                        usuarioAutenticado
+                );
 
-    } else {
+                aplicativo.mostrarChat(stage);
 
-        mensagemStatus.setText(
-                "Usuário ou senha incorretos."
-        );
-    }
+            } else {
 
+                mensagemStatus.setText(
+                        "Usuário ou senha incorretos."
+                );
+            }
         });
 
         // ==========================================
@@ -108,17 +117,17 @@ public class LoginView {
         Button botaoCadastro =
                 new Button("Criar uma conta");
 
-                botaoCadastro.setOnAction(event -> {
+        botaoCadastro.setOnAction(event -> {
 
-    CadastroView cadastroView =
-            new CadastroView(
-                    stage,
-                    this,
-                    gerenciadorUsuarios
-            );
+            CadastroView cadastroView =
+                    new CadastroView(
+                            stage,
+                            this,
+                            gerenciadorUsuarios
+                    );
 
-    cadastroView.mostrar();
-});
+            cadastroView.mostrar();
+        });
 
         // ==========================================
         // LAYOUT
@@ -171,3 +180,4 @@ public class LoginView {
         stage.show();
     }
 }
+

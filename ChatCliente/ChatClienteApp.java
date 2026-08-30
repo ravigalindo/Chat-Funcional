@@ -23,6 +23,9 @@ public class ChatClienteApp extends javafx.application.Application {
     private final GerenciadorUsuarios gerenciadorUsuarios =
             new GerenciadorUsuarios();
 
+    private final Sessao sessao =
+            new Sessao();
+
     private final Map<String, List<Mensagem>> historicoConversas =
             new HashMap<>();
 
@@ -34,13 +37,14 @@ public class ChatClienteApp extends javafx.application.Application {
     public void start(Stage stage) {
 
         LoginView loginView =
-            new LoginView(
-                    stage,
-                    this,
-                    gerenciadorUsuarios
-            );
+                new LoginView(
+                        stage,
+                        this,
+                        gerenciadorUsuarios,
+                        sessao
+                );
 
-    loginView.mostrar();
+        loginView.mostrar();
     }
 
     // ==========================================
@@ -49,9 +53,17 @@ public class ChatClienteApp extends javafx.application.Application {
 
     public void mostrarChat(Stage stage) {
 
+        Usuario usuarioLogado =
+        sessao.getUsuarioLogado();
+
         // ==========================================
         // CONTATOS
         // ==========================================
+        
+        Label usuarioLogadoLabel =
+        new Label(
+                "👤 " + usuarioLogado.getNome()
+        );
 
         Label tituloContatos =
                 new Label("CONTATOS");
@@ -189,6 +201,19 @@ public class ChatClienteApp extends javafx.application.Application {
         // ==========================================
         // PAINEL DA CONVERSA
         // ==========================================
+        HBox topo =
+        new HBox(
+                10,
+                usuarioLogadoLabel
+        );
+
+topo.setAlignment(
+        Pos.CENTER_RIGHT
+);
+
+topo.setPadding(
+        new Insets(10)
+);
 
         BorderPane painelConversa =
                 new BorderPane();
@@ -215,15 +240,19 @@ public class ChatClienteApp extends javafx.application.Application {
         // ==========================================
 
         BorderPane layoutPrincipal =
-                new BorderPane();
+        new BorderPane();
 
-        layoutPrincipal.setLeft(
-                painelContatos
-        );
+layoutPrincipal.setTop(
+        topo
+);
 
-        layoutPrincipal.setCenter(
-                painelConversa
-        );
+layoutPrincipal.setLeft(
+        painelContatos
+);
+
+layoutPrincipal.setCenter(
+        painelConversa
+);
 
         // ==========================================
         // CENA
@@ -376,3 +405,4 @@ public class ChatClienteApp extends javafx.application.Application {
         launch();
     }
 }
+
