@@ -1,9 +1,6 @@
 package ChatServidor;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -17,36 +14,37 @@ public class ChatServidor {
 
         try (ServerSocket servidor = new ServerSocket(PORTA)) {
 
-            System.out.println("Servidor iniciado na porta " + PORTA);
-            System.out.println("Aguardando conexão...");
-
-            Socket cliente = servidor.accept();
-
-            System.out.println("Cliente conectado!");
-            System.out.println("IP do cliente: "
-                    + cliente.getInetAddress().getHostAddress());
-
-            BufferedReader entrada = new BufferedReader(
-                    new InputStreamReader(cliente.getInputStream())
+            System.out.println(
+                    "Servidor iniciado na porta " + PORTA
             );
 
-            PrintWriter saida = new PrintWriter(
-                    cliente.getOutputStream(),
-                    true
+            System.out.println(
+                    "Aguardando conexões..."
             );
 
-            String mensagem = entrada.readLine();
+            while (true) {
 
-            System.out.println("Mensagem recebida: " + mensagem);
+                Socket cliente = servidor.accept();
 
-            saida.println("Olá cliente! O servidor recebeu sua mensagem.");
+                System.out.println(
+                        "Novo cliente conectado!"
+                );
 
-            cliente.close();
+                ClienteHandler clienteHandler =
+                        new ClienteHandler(cliente);
+
+                Thread thread =
+                        new Thread(clienteHandler);
+
+                thread.start();
+            }
 
         } catch (IOException e) {
-            System.out.println("Erro no servidor: " + e.getMessage());
-        }
 
-        System.out.println("Servidor encerrado.");
+            System.out.println(
+                    "Erro no servidor: "
+                            + e.getMessage()
+            );
+        }
     }
 }
