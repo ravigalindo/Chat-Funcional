@@ -56,6 +56,29 @@ public class GerenciadorUsuarios {
     }
 
     // ==========================================
+// OBTER USUÁRIO AUTENTICADO
+// ==========================================
+
+public Usuario obterUsuarioAutenticado(
+        String nome,
+        String senha
+) {
+
+    Usuario usuario =
+            buscarUsuario(nome);
+
+    if (usuario == null) {
+        return null;
+    }
+
+    if (!usuario.getSenha().equals(senha)) {
+        return null;
+    }
+
+    return usuario;
+}
+    
+// ==========================================
     // BUSCAR USUÁRIO
     // ==========================================
 
