@@ -9,13 +9,20 @@ import java.net.Socket;
 public class ClienteHandler implements Runnable {
 
     private final Socket cliente;
+    private final GerenciadorClientes gerenciador;
 
-    public ClienteHandler(Socket cliente) {
+    public ClienteHandler(
+            Socket cliente,
+            GerenciadorClientes gerenciador
+    ) {
         this.cliente = cliente;
+        this.gerenciador = gerenciador;
     }
 
     @Override
     public void run() {
+
+        gerenciador.adicionarCliente(this);
 
         try (
                 BufferedReader entrada = new BufferedReader(
@@ -30,18 +37,22 @@ public class ClienteHandler implements Runnable {
 
             System.out.println(
                     "Atendendo cliente: "
-                            + cliente.getInetAddress().getHostAddress()
+                            + cliente.getInetAddress()
+                            .getHostAddress()
             );
 
-            String mensagem = entrada.readLine();
+            String mensagem;
 
-            System.out.println(
-                    "Mensagem recebida: " + mensagem
-            );
+            while ((mensagem = entrada.readLine()) != null) {
 
-            saida.println(
-                    "Servidor recebeu: " + mensagem
-            );
+                System.out.println(
+                        "Mensagem recebida: " + mensagem
+                );
+
+                saida.println(
+                        "Servidor recebeu: " + mensagem
+                );
+            }
 
         } catch (IOException e) {
 
@@ -52,6 +63,8 @@ public class ClienteHandler implements Runnable {
 
         } finally {
 
+            gerenciador.removerCliente(this);
+
             try {
                 cliente.close();
             } catch (IOException e) {
@@ -61,7 +74,9 @@ public class ClienteHandler implements Runnable {
                 );
             }
 
-            System.out.println("Cliente desconectado.");
+            System.out.println(
+                    "Cliente desconectado."
+            );
         }
     }
 }

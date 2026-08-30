@@ -15,30 +15,58 @@ public class ChatCliente {
 
         System.out.println("Iniciando cliente...");
 
-        try (Socket socket = new Socket(HOST, PORTA)) {
+        try (
+                Socket socket = new Socket(HOST, PORTA);
+
+                BufferedReader entrada = new BufferedReader(
+                        new InputStreamReader(socket.getInputStream())
+                );
+
+                PrintWriter saida = new PrintWriter(
+                        socket.getOutputStream(),
+                        true
+                );
+
+                BufferedReader teclado = new BufferedReader(
+                        new InputStreamReader(System.in)
+                )
+        ) {
 
             System.out.println("Conectado ao servidor!");
+            System.out.println("Digite uma mensagem.");
+            System.out.println("Digite /sair para desconectar.");
+            System.out.println();
 
-            BufferedReader entrada = new BufferedReader(
-                    new InputStreamReader(socket.getInputStream())
-            );
+            String mensagem;
 
-            PrintWriter saida = new PrintWriter(
-                    socket.getOutputStream(),
-                    true
-            );
+            while (true) {
 
-            saida.println("Olá servidor!");
+                System.out.print("Você: ");
 
-            System.out.println("Mensagem enviada!");
+                mensagem = teclado.readLine();
 
-            String resposta = entrada.readLine();
+                if (mensagem == null || mensagem.equalsIgnoreCase("/sair")) {
+                    break;
+                }
 
-            System.out.println("Resposta do servidor: " + resposta);
+                if (mensagem.isBlank()) {
+                    continue;
+                }
+
+                saida.println(mensagem);
+
+                String resposta = entrada.readLine();
+
+                System.out.println(
+                        "Servidor: " + resposta
+                );
+            }
 
         } catch (IOException e) {
-            System.out.println("Erro ao conectar ao servidor: "
-                    + e.getMessage());
+
+            System.out.println(
+                    "Erro na conexão: " + e.getMessage()
+            );
         }
 
         System.out.println("Cliente encerrado.");
