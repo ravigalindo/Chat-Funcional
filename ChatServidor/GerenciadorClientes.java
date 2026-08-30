@@ -8,6 +8,7 @@ public class GerenciadorClientes {
     private final List<ClienteHandler> clientes = new ArrayList<>();
 
     public synchronized void adicionarCliente(ClienteHandler cliente) {
+
         clientes.add(cliente);
 
         System.out.println(
@@ -17,6 +18,7 @@ public class GerenciadorClientes {
     }
 
     public synchronized void removerCliente(ClienteHandler cliente) {
+
         clientes.remove(cliente);
 
         System.out.println(
@@ -25,7 +27,25 @@ public class GerenciadorClientes {
         );
     }
 
+    public synchronized ClienteHandler encontrarCliente(
+            String nomeUsuario
+    ) {
+
+        for (ClienteHandler cliente : clientes) {
+
+            if (nomeUsuario.equalsIgnoreCase(
+                    cliente.getNomeUsuario()
+            )) {
+
+                return cliente;
+            }
+        }
+
+        return null;
+    }
+
     public synchronized List<ClienteHandler> getClientes() {
+
         return new ArrayList<>(clientes);
     }
 }
