@@ -12,10 +12,15 @@ public class ChatServidor {
 
         System.out.println("Iniciando servidor...");
 
-        try (ServerSocket servidor = new ServerSocket(PORTA)) {
+        GerenciadorClientes gerenciador =
+                new GerenciadorClientes();
+
+        try (ServerSocket servidor =
+                     new ServerSocket(PORTA)) {
 
             System.out.println(
-                    "Servidor iniciado na porta " + PORTA
+                    "Servidor iniciado na porta "
+                            + PORTA
             );
 
             System.out.println(
@@ -24,14 +29,18 @@ public class ChatServidor {
 
             while (true) {
 
-                Socket cliente = servidor.accept();
+                Socket cliente =
+                        servidor.accept();
 
                 System.out.println(
                         "Novo cliente conectado!"
                 );
 
                 ClienteHandler clienteHandler =
-                        new ClienteHandler(cliente);
+                        new ClienteHandler(
+                                cliente,
+                                gerenciador
+                        );
 
                 Thread thread =
                         new Thread(clienteHandler);
