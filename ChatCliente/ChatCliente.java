@@ -1,6 +1,9 @@
 package ChatCliente;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.Socket;
 
 public class ChatCliente {
@@ -15,6 +18,23 @@ public class ChatCliente {
         try (Socket socket = new Socket(HOST, PORTA)) {
 
             System.out.println("Conectado ao servidor!");
+
+            BufferedReader entrada = new BufferedReader(
+                    new InputStreamReader(socket.getInputStream())
+            );
+
+            PrintWriter saida = new PrintWriter(
+                    socket.getOutputStream(),
+                    true
+            );
+
+            saida.println("Olá servidor!");
+
+            System.out.println("Mensagem enviada!");
+
+            String resposta = entrada.readLine();
+
+            System.out.println("Resposta do servidor: " + resposta);
 
         } catch (IOException e) {
             System.out.println("Erro ao conectar ao servidor: "

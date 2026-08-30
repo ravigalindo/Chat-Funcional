@@ -1,6 +1,9 @@
 package ChatServidor;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -20,8 +23,23 @@ public class ChatServidor {
             Socket cliente = servidor.accept();
 
             System.out.println("Cliente conectado!");
-            System.out.println("IP do cliente: " +
-                    cliente.getInetAddress().getHostAddress());
+            System.out.println("IP do cliente: "
+                    + cliente.getInetAddress().getHostAddress());
+
+            BufferedReader entrada = new BufferedReader(
+                    new InputStreamReader(cliente.getInputStream())
+            );
+
+            PrintWriter saida = new PrintWriter(
+                    cliente.getOutputStream(),
+                    true
+            );
+
+            String mensagem = entrada.readLine();
+
+            System.out.println("Mensagem recebida: " + mensagem);
+
+            saida.println("Olá cliente! O servidor recebeu sua mensagem.");
 
             cliente.close();
 
