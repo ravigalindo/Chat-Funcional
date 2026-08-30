@@ -11,6 +11,10 @@ public class ClienteHandler implements Runnable {
     private final Socket cliente;
     private final GerenciadorClientes gerenciador;
 
+    private String nomeUsuario;
+
+    private PrintWriter saida;
+
     public ClienteHandler(
             Socket cliente,
             GerenciadorClientes gerenciador
@@ -26,32 +30,28 @@ public class ClienteHandler implements Runnable {
 
         try (
                 BufferedReader entrada = new BufferedReader(
-                        new InputStreamReader(cliente.getInputStream())
-                );
-
-                PrintWriter saida = new PrintWriter(
-                        cliente.getOutputStream(),
-                        true
+                        new InputStreamReader(
+                                cliente.getInputStream()
+                        )
                 )
         ) {
 
+            saida = new PrintWriter(
+                    cliente.getOutputStream(),
+                    true
+            );
+
             System.out.println(
-                    "Atendendo cliente: "
+                    "Cliente conectado: "
                             + cliente.getInetAddress()
-                            .getHostAddress()
+                                    .getHostAddress()
             );
 
             String mensagem;
 
             while ((mensagem = entrada.readLine()) != null) {
 
-                System.out.println(
-                        "Mensagem recebida: " + mensagem
-                );
-
-                saida.println(
-                        "Servidor recebeu: " + mensagem
-                );
+                processarMensagem(mensagem);
             }
 
         } catch (IOException e) {
@@ -69,14 +69,101 @@ public class ClienteHandler implements Runnable {
                 cliente.close();
             } catch (IOException e) {
                 System.out.println(
-                        "Erro ao fechar conexão: "
-                                + e.getMessage()
+                        "Erro ao fechar conexão."
                 );
             }
 
             System.out.println(
-                    "Cliente desconectado."
+                    "Cliente desconectado: "
+                            + nomeUsuario
             );
         }
+    }
+
+    private void processarMensagem(String mensagem) {
+
+        String[] partes = mensagem.split("\\|", 3);
+
+        String comando = partes[0];
+
+        switch (comando) {
+
+            case "LOGIN":
+
+                if (partes.length < 2) {
+                    saida.println("ERRO|Nome de usuário inválido");
+                    return;
+                }
+
+                nomeUsuario = partes[1];
+
+                System.out.println(
+                        "Usuário identificado como: "
+                                + nomeUsuario
+                );
+
+                saida.println(
+                        "LOGIN_OK|" + nomeUsuario
+                );
+
+                break;
+
+            case "MESSAGE":
+
+                if (partes.length < 3) {
+                    saida.println(
+                            "ERRO|Mensagem inválida"
+                    );
+                    return;
+                }
+
+                String destinatario = partes[1];
+                String conteudo = partes[2];
+
+                ClienteHandler clienteDestino =
+                        gerenciador.encontrarCliente(
+                                destinatario
+                        );
+
+                if (clienteDestino == null) {
+
+                    saida.println(
+                            "ERRO|Usuário não encontrado"
+                    );
+
+                    return;
+                }
+
+                clienteDestino.enviarMensagem(
+                        "MESSAGE|"
+                                + nomeUsuario
+                                + "|"
+                                + conteudo
+                );
+
+                saida.println(
+                        "MESSAGE_SENT"
+                );
+
+                break;
+
+            default:
+
+                saida.println(
+                        "ERRO|Comando desconhecido"
+                );
+        }
+    }
+
+    public void enviarMensagem(String mensagem) {
+
+        if (saida != null) {
+            saida.println(mensagem);
+        }
+    }
+
+    public String getNomeUsuario() {
+
+        return nomeUsuario;
     }
 }

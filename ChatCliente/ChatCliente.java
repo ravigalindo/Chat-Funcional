@@ -18,34 +18,77 @@ public class ChatCliente {
         try (
                 Socket socket = new Socket(HOST, PORTA);
 
-                BufferedReader entrada = new BufferedReader(
-                        new InputStreamReader(socket.getInputStream())
-                );
+                BufferedReader entrada =
+                        new BufferedReader(
+                                new InputStreamReader(
+                                        socket.getInputStream()
+                                )
+                        );
 
-                PrintWriter saida = new PrintWriter(
-                        socket.getOutputStream(),
-                        true
-                );
+                PrintWriter saida =
+                        new PrintWriter(
+                                socket.getOutputStream(),
+                                true
+                        );
 
-                BufferedReader teclado = new BufferedReader(
-                        new InputStreamReader(System.in)
-                )
+                BufferedReader teclado =
+                        new BufferedReader(
+                                new InputStreamReader(
+                                        System.in
+                                )
+                        )
         ) {
 
-            System.out.println("Conectado ao servidor!");
-            System.out.println("Digite uma mensagem.");
-            System.out.println("Digite /sair para desconectar.");
-            System.out.println();
+            System.out.println(
+                    "Conectado ao servidor!"
+            );
 
-            String mensagem;
+            System.out.print(
+                    "Digite seu nome: "
+            );
+
+            String nome = teclado.readLine();
+
+            saida.println(
+                    "LOGIN|" + nome
+            );
+
+            String respostaLogin =
+                    entrada.readLine();
+
+            System.out.println(
+                    "Servidor: "
+                            + respostaLogin
+            );
+
+            System.out.println();
+            System.out.println(
+                    "Digite mensagens no formato:"
+            );
+
+            System.out.println(
+                    "destinatario|mensagem"
+            );
+
+            System.out.println(
+                    "Digite /sair para desconectar."
+            );
 
             while (true) {
 
-                System.out.print("Você: ");
+                System.out.print(
+                        nome + ": "
+                );
 
-                mensagem = teclado.readLine();
+                String mensagem =
+                        teclado.readLine();
 
-                if (mensagem == null || mensagem.equalsIgnoreCase("/sair")) {
+                if (
+                        mensagem == null
+                                || mensagem.equalsIgnoreCase(
+                                "/sair"
+                        )
+                ) {
                     break;
                 }
 
@@ -53,9 +96,33 @@ public class ChatCliente {
                     continue;
                 }
 
-                saida.println(mensagem);
+                String[] partes =
+                        mensagem.split("\\|", 2);
 
-                String resposta = entrada.readLine();
+                if (partes.length < 2) {
+
+                    System.out.println(
+                            "Formato inválido."
+                    );
+
+                    continue;
+                }
+
+                String destinatario =
+                        partes[0];
+
+                String conteudo =
+                        partes[1];
+
+                saida.println(
+                        "MESSAGE|"
+                                + destinatario
+                                + "|"
+                                + conteudo
+                );
+
+                String resposta =
+                        entrada.readLine();
 
                 System.out.println(
                         "Servidor: " + resposta
@@ -65,10 +132,13 @@ public class ChatCliente {
         } catch (IOException e) {
 
             System.out.println(
-                    "Erro na conexão: " + e.getMessage()
+                    "Erro na conexão: "
+                            + e.getMessage()
             );
         }
 
-        System.out.println("Cliente encerrado.");
+        System.out.println(
+                "Cliente encerrado."
+        );
     }
 }
