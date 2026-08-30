@@ -20,6 +20,9 @@ import java.util.Map;
 
 public class ChatClienteApp extends javafx.application.Application {
 
+    private final GerenciadorUsuarios gerenciadorUsuarios =
+            new GerenciadorUsuarios();
+
     private final Map<String, List<Mensagem>> historicoConversas =
             new HashMap<>();
 
@@ -29,6 +32,26 @@ public class ChatClienteApp extends javafx.application.Application {
 
     @Override
     public void start(Stage stage) {
+
+        LoginView loginView =
+            new LoginView(
+                    stage,
+                    this,
+                    gerenciadorUsuarios
+            );
+
+    loginView.mostrar();
+    }
+
+    // ==========================================
+    // INTERFACE PRINCIPAL DO CHAT
+    // ==========================================
+
+    public void mostrarChat(Stage stage) {
+
+        // ==========================================
+        // CONTATOS
+        // ==========================================
 
         Label tituloContatos =
                 new Label("CONTATOS");
@@ -42,8 +65,16 @@ public class ChatClienteApp extends javafx.application.Application {
                 "⚫ Carlos"
         );
 
+        // ==========================================
+        // NOME DO CONTATO
+        // ==========================================
+
         Label nomeContato =
                 new Label("Selecione um contato");
+
+        // ==========================================
+        // ÁREA DE MENSAGENS
+        // ==========================================
 
         mensagens =
                 new VBox(10);
@@ -53,9 +84,13 @@ public class ChatClienteApp extends javafx.application.Application {
         );
 
         ScrollPane scrollMensagens =
-        new ScrollPane(mensagens);
+                new ScrollPane(mensagens);
 
         scrollMensagens.setFitToWidth(true);
+
+        // ==========================================
+        // CAMPO DE MENSAGEM
+        // ==========================================
 
         TextField campoMensagem =
                 new TextField();
@@ -67,6 +102,10 @@ public class ChatClienteApp extends javafx.application.Application {
         Button botaoEnviar =
                 new Button("Enviar");
 
+        // ==========================================
+        // BOTÃO ENVIAR
+        // ==========================================
+
         botaoEnviar.setOnAction(event -> {
 
             enviarMensagem(
@@ -74,12 +113,20 @@ public class ChatClienteApp extends javafx.application.Application {
             );
         });
 
+        // ==========================================
+        // ENTER PARA ENVIAR
+        // ==========================================
+
         campoMensagem.setOnAction(event -> {
 
             enviarMensagem(
                     campoMensagem
             );
         });
+
+        // ==========================================
+        // CAMPO DE ENVIO
+        // ==========================================
 
         HBox campoEnvio =
                 new HBox(
@@ -96,6 +143,10 @@ public class ChatClienteApp extends javafx.application.Application {
                 campoMensagem,
                 javafx.scene.layout.Priority.ALWAYS
         );
+
+        // ==========================================
+        // SELEÇÃO DE CONTATO
+        // ==========================================
 
         listaContatos.setOnMouseClicked(event -> {
 
@@ -118,6 +169,10 @@ public class ChatClienteApp extends javafx.application.Application {
             }
         });
 
+        // ==========================================
+        // PAINEL DE CONTATOS
+        // ==========================================
+
         VBox painelContatos =
                 new VBox(
                         10,
@@ -130,6 +185,10 @@ public class ChatClienteApp extends javafx.application.Application {
         );
 
         painelContatos.setPrefWidth(200);
+
+        // ==========================================
+        // PAINEL DA CONVERSA
+        // ==========================================
 
         BorderPane painelConversa =
                 new BorderPane();
@@ -151,6 +210,10 @@ public class ChatClienteApp extends javafx.application.Application {
                 new Insets(15)
         );
 
+        // ==========================================
+        // LAYOUT PRINCIPAL
+        // ==========================================
+
         BorderPane layoutPrincipal =
                 new BorderPane();
 
@@ -162,12 +225,20 @@ public class ChatClienteApp extends javafx.application.Application {
                 painelConversa
         );
 
+        // ==========================================
+        // CENA
+        // ==========================================
+
         Scene scene =
                 new Scene(
                         layoutPrincipal,
                         800,
                         600
                 );
+
+        // ==========================================
+        // JANELA
+        // ==========================================
 
         stage.setTitle(
                 "Chat - Segurança da Informação"
@@ -177,6 +248,10 @@ public class ChatClienteApp extends javafx.application.Application {
 
         stage.show();
     }
+
+    // ==========================================
+    // ENVIAR MENSAGEM
+    // ==========================================
 
     private void enviarMensagem(
             TextField campoMensagem
@@ -213,6 +288,10 @@ public class ChatClienteApp extends javafx.application.Application {
 
         campoMensagem.clear();
     }
+
+    // ==========================================
+    // ADICIONAR MENSAGEM NA TELA
+    // ==========================================
 
     private void adicionarMensagemNaTela(
             Mensagem mensagem
@@ -254,6 +333,10 @@ public class ChatClienteApp extends javafx.application.Application {
         );
     }
 
+    // ==========================================
+    // CARREGAR HISTÓRICO
+    // ==========================================
+
     private void carregarHistorico() {
 
         mensagens.getChildren().clear();
@@ -274,6 +357,10 @@ public class ChatClienteApp extends javafx.application.Application {
             );
         }
     }
+
+    // ==========================================
+    // REMOVER STATUS DO NOME
+    // ==========================================
 
     private String removerStatus(
             String contato
