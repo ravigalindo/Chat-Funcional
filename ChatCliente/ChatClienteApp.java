@@ -47,23 +47,15 @@ public class ChatClienteApp extends javafx.application.Application {
         loginView.mostrar();
     }
 
-    // ==========================================
-    // INTERFACE PRINCIPAL DO CHAT
-    // ==========================================
-
     public void mostrarChat(Stage stage) {
 
         Usuario usuarioLogado =
-        sessao.getUsuarioLogado();
+                sessao.getUsuarioLogado();
 
-        // ==========================================
-        // CONTATOS
-        // ==========================================
-        
         Label usuarioLogadoLabel =
-        new Label(
-                "👤 " + usuarioLogado.getNome()
-        );
+                new Label(
+                        "👤 " + usuarioLogado.getNome()
+                );
 
         Label tituloContatos =
                 new Label("CONTATOS");
@@ -77,16 +69,8 @@ public class ChatClienteApp extends javafx.application.Application {
                 "⚫ Carlos"
         );
 
-        // ==========================================
-        // NOME DO CONTATO
-        // ==========================================
-
         Label nomeContato =
                 new Label("Selecione um contato");
-
-        // ==========================================
-        // ÁREA DE MENSAGENS
-        // ==========================================
 
         mensagens =
                 new VBox(10);
@@ -100,10 +84,6 @@ public class ChatClienteApp extends javafx.application.Application {
 
         scrollMensagens.setFitToWidth(true);
 
-        // ==========================================
-        // CAMPO DE MENSAGEM
-        // ==========================================
-
         TextField campoMensagem =
                 new TextField();
 
@@ -114,31 +94,13 @@ public class ChatClienteApp extends javafx.application.Application {
         Button botaoEnviar =
                 new Button("Enviar");
 
-        // ==========================================
-        // BOTÃO ENVIAR
-        // ==========================================
-
         botaoEnviar.setOnAction(event -> {
-
-            enviarMensagem(
-                    campoMensagem
-            );
+            enviarMensagem(campoMensagem);
         });
-
-        // ==========================================
-        // ENTER PARA ENVIAR
-        // ==========================================
 
         campoMensagem.setOnAction(event -> {
-
-            enviarMensagem(
-                    campoMensagem
-            );
+            enviarMensagem(campoMensagem);
         });
-
-        // ==========================================
-        // CAMPO DE ENVIO
-        // ==========================================
 
         HBox campoEnvio =
                 new HBox(
@@ -155,10 +117,6 @@ public class ChatClienteApp extends javafx.application.Application {
                 campoMensagem,
                 javafx.scene.layout.Priority.ALWAYS
         );
-
-        // ==========================================
-        // SELEÇÃO DE CONTATO
-        // ==========================================
 
         listaContatos.setOnMouseClicked(event -> {
 
@@ -181,10 +139,6 @@ public class ChatClienteApp extends javafx.application.Application {
             }
         });
 
-        // ==========================================
-        // PAINEL DE CONTATOS
-        // ==========================================
-
         VBox painelContatos =
                 new VBox(
                         10,
@@ -197,23 +151,6 @@ public class ChatClienteApp extends javafx.application.Application {
         );
 
         painelContatos.setPrefWidth(200);
-
-        // ==========================================
-        // PAINEL DA CONVERSA
-        // ==========================================
-        HBox topo =
-        new HBox(
-                10,
-                usuarioLogadoLabel
-        );
-
-topo.setAlignment(
-        Pos.CENTER_RIGHT
-);
-
-topo.setPadding(
-        new Insets(10)
-);
 
         BorderPane painelConversa =
                 new BorderPane();
@@ -235,28 +172,34 @@ topo.setPadding(
                 new Insets(15)
         );
 
-        // ==========================================
-        // LAYOUT PRINCIPAL
-        // ==========================================
+        HBox topo =
+                new HBox(
+                        10,
+                        usuarioLogadoLabel
+                );
+
+        topo.setAlignment(
+                Pos.CENTER_RIGHT
+        );
+
+        topo.setPadding(
+                new Insets(10)
+        );
 
         BorderPane layoutPrincipal =
-        new BorderPane();
+                new BorderPane();
 
-layoutPrincipal.setTop(
-        topo
-);
+        layoutPrincipal.setTop(
+                topo
+        );
 
-layoutPrincipal.setLeft(
-        painelContatos
-);
+        layoutPrincipal.setLeft(
+                painelContatos
+        );
 
-layoutPrincipal.setCenter(
-        painelConversa
-);
-
-        // ==========================================
-        // CENA
-        // ==========================================
+        layoutPrincipal.setCenter(
+                painelConversa
+        );
 
         Scene scene =
                 new Scene(
@@ -264,10 +207,6 @@ layoutPrincipal.setCenter(
                         800,
                         600
                 );
-
-        // ==========================================
-        // JANELA
-        // ==========================================
 
         stage.setTitle(
                 "Chat - Segurança da Informação"
@@ -277,10 +216,6 @@ layoutPrincipal.setCenter(
 
         stage.show();
     }
-
-    // ==========================================
-    // ENVIAR MENSAGEM
-    // ==========================================
 
     private void enviarMensagem(
             TextField campoMensagem
@@ -299,7 +234,7 @@ layoutPrincipal.setCenter(
 
         Mensagem mensagem =
                 new Mensagem(
-                        "Você",
+                        sessao.getUsuarioLogado().getNome(),
                         texto,
                         true
                 );
@@ -318,53 +253,81 @@ layoutPrincipal.setCenter(
         campoMensagem.clear();
     }
 
-    // ==========================================
-    // ADICIONAR MENSAGEM NA TELA
-    // ==========================================
-
     private void adicionarMensagemNaTela(
             Mensagem mensagem
     ) {
 
-        Label textoMensagem =
+        // Nome do remetente
+        Label remetente =
+                new Label(
+                        mensagem.getRemetente()
+                );
+
+        remetente.setStyle(
+                "-fx-font-weight: bold;"
+        );
+
+        // Conteúdo da mensagem
+        Label conteudo =
                 new Label(
                         mensagem.getConteudo()
                 );
 
-        textoMensagem.setWrapText(true);
+        conteudo.setWrapText(true);
 
-        textoMensagem.setPadding(
+        conteudo.setMaxWidth(350);
+
+        // Balão da mensagem
+        VBox balaoMensagem =
+                new VBox(
+                        3,
+                        remetente,
+                        conteudo
+                );
+
+        balaoMensagem.setPadding(
                 new Insets(10)
         );
 
-        textoMensagem.setMaxWidth(400);
+        balaoMensagem.setMaxWidth(400);
 
-        HBox balao =
+        balaoMensagem.setStyle(
+                "-fx-background-color: #E8E8E8;"
+                + "-fx-background-radius: 10;"
+        );
+
+        // Container responsável pelo alinhamento
+        HBox linhaMensagem =
                 new HBox(
-                        textoMensagem
+                        balaoMensagem
                 );
+
+        linhaMensagem.setPadding(
+                new Insets(3, 0, 3, 0)
+        );
 
         if (mensagem.isEnviadaPorMim()) {
 
-            balao.setAlignment(
+            linhaMensagem.setAlignment(
                     Pos.CENTER_RIGHT
+            );
+
+            balaoMensagem.setStyle(
+                    "-fx-background-color: #DCF8C6;"
+                    + "-fx-background-radius: 10;"
             );
 
         } else {
 
-            balao.setAlignment(
+            linhaMensagem.setAlignment(
                     Pos.CENTER_LEFT
             );
         }
 
         mensagens.getChildren().add(
-                balao
+                linhaMensagem
         );
     }
-
-    // ==========================================
-    // CARREGAR HISTÓRICO
-    // ==========================================
 
     private void carregarHistorico() {
 
@@ -379,17 +342,14 @@ layoutPrincipal.setCenter(
             return;
         }
 
-        for (Mensagem mensagem : historico) {
+        for (Mensagem mensagem :
+                historico) {
 
             adicionarMensagemNaTela(
                     mensagem
             );
         }
     }
-
-    // ==========================================
-    // REMOVER STATUS DO NOME
-    // ==========================================
 
     private String removerStatus(
             String contato
@@ -401,8 +361,6 @@ layoutPrincipal.setCenter(
     }
 
     public static void main(String[] args) {
-
         launch();
     }
 }
-
