@@ -1,22 +1,37 @@
 package ChatCliente;
 
 import javafx.application.Platform;
+
 import javafx.geometry.Insets;
+
 import javafx.geometry.Pos;
+
 import javafx.scene.Scene;
+
 import javafx.scene.control.Button;
+
 import javafx.scene.control.Label;
+
 import javafx.scene.control.ListView;
+
 import javafx.scene.control.ScrollPane;
+
 import javafx.scene.control.TextField;
+
 import javafx.scene.layout.BorderPane;
+
 import javafx.scene.layout.HBox;
+
 import javafx.scene.layout.VBox;
+
 import javafx.stage.Stage;
 
 import java.util.ArrayList;
+
 import java.util.HashMap;
+
 import java.util.List;
+
 import java.util.Map;
 
 public class ChatClienteApp
@@ -102,6 +117,32 @@ public class ChatClienteApp
             return;
         }
 
+        /*
+         * Recebe a lista inicial de usuários
+         * que estão online.
+         */
+        if (mensagem.startsWith("USERS|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 2);
+
+            if (partes.length < 2) {
+                return;
+            }
+
+            String usuarios =
+                    partes[1];
+
+            Platform.runLater(() -> {
+
+                atualizarListaContatos(
+                        usuarios
+                );
+            });
+
+            return;
+        }
+
         if (mensagem.startsWith("ONLINE|")) {
 
             String[] partes =
@@ -163,12 +204,6 @@ public class ChatClienteApp
 
         listaContatos =
                 new ListView<>();
-
-        listaContatos.getItems().addAll(
-                "⚫ João",
-                "⚫ Maria",
-                "⚫ Carlos"
-        );
 
         Label nomeContato =
                 new Label(
@@ -330,6 +365,61 @@ public class ChatClienteApp
 
         stage.setScene(scene);
         stage.show();
+    }
+
+    /*
+     * Atualiza a lista de contatos usando
+     * os usuários que o servidor informou
+     * como online.
+     */
+    private void atualizarListaContatos(
+            String usuarios
+    ) {
+
+        if (listaContatos == null) {
+            return;
+        }
+
+        listaContatos
+                .getItems()
+                .clear();
+
+        if (usuarios.isEmpty()) {
+            return;
+        }
+
+        String meuNome =
+                sessao
+                        .getUsuarioLogado()
+                        .getNome();
+
+        String[] listaUsuarios =
+                usuarios.split(",");
+
+        for (String nomeUsuario :
+                listaUsuarios) {
+
+            nomeUsuario =
+                    nomeUsuario.trim();
+
+            if (nomeUsuario.isEmpty()) {
+                continue;
+            }
+
+            // Não adiciona o próprio usuário
+            if (nomeUsuario.equalsIgnoreCase(
+                    meuNome
+            )) {
+                continue;
+            }
+
+            listaContatos
+                    .getItems()
+                    .add(
+                            "🟢 "
+                                    + nomeUsuario
+                    );
+        }
     }
 
     private void atualizarStatusContato(

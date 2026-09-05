@@ -111,40 +111,51 @@ public class ClienteHandler implements Runnable {
     }
 
     private void processarLogin(
-            String[] partes
-    ) {
+        String[] partes
+) {
 
-        if (partes.length < 2) {
-
-            saida.println(
-                    "ERRO|Nome de usuário inválido"
-            );
-
-            return;
-        }
-
-        nomeUsuario =
-                partes[1];
-
-        System.out.println(
-                "Usuário identificado como: "
-                        + nomeUsuario
-        );
-
-        gerenciador.adicionarCliente(
-                this
-        );
+    if (partes.length < 2) {
 
         saida.println(
-                "LOGIN_OK|"
-                        + nomeUsuario
+                "ERRO|Nome de usuário inválido"
         );
 
-        gerenciador.enviarParaTodos(
-                "ONLINE|"
-                        + nomeUsuario
-        );
+        return;
     }
+
+    nomeUsuario =
+            partes[1];
+
+    System.out.println(
+            "Usuário identificado como: "
+                    + nomeUsuario
+    );
+
+    gerenciador.adicionarCliente(
+            this
+    );
+
+    // Primeiro confirma o login
+    saida.println(
+            "LOGIN_OK|"
+                    + nomeUsuario
+    );
+
+    // Depois envia a lista de usuários online
+    String usuariosOnline =
+            gerenciador.obterUsuariosOnline();
+
+    saida.println(
+            "USERS|"
+                    + usuariosOnline
+    );
+
+    // Avisa os clientes sobre o novo usuário
+    gerenciador.enviarParaTodos(
+            "ONLINE|"
+                    + nomeUsuario
+    );
+}
 
     private void processarMensagemChat(
             String[] partes
