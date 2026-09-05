@@ -75,4 +75,28 @@ public class GerenciadorClientes {
             );
         }
     }
+
+    public synchronized String obterUsuariosOnline() {
+
+        StringBuilder usuarios =
+                new StringBuilder();
+
+        for (ClienteHandler cliente : clientes) {
+
+            String nome =
+                    cliente.getNomeUsuario();
+
+            if (nome == null) {
+                continue;
+            }
+
+            if (usuarios.length() > 0) {
+                usuarios.append(",");
+            }
+
+            usuarios.append(nome);
+        }
+
+        return usuarios.toString();
+    }
 }
