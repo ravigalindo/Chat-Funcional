@@ -5,9 +5,12 @@ import java.util.List;
 
 public class GerenciadorClientes {
 
-    private final List<ClienteHandler> clientes = new ArrayList<>();
+    private final List<ClienteHandler> clientes =
+            new ArrayList<>();
 
-    public synchronized void adicionarCliente(ClienteHandler cliente) {
+    public synchronized void adicionarCliente(
+            ClienteHandler cliente
+    ) {
 
         clientes.add(cliente);
 
@@ -17,7 +20,9 @@ public class GerenciadorClientes {
         );
     }
 
-    public synchronized void removerCliente(ClienteHandler cliente) {
+    public synchronized void removerCliente(
+            ClienteHandler cliente
+    ) {
 
         clientes.remove(cliente);
 
@@ -25,6 +30,16 @@ public class GerenciadorClientes {
                 "Cliente removido. Total conectado: "
                         + clientes.size()
         );
+
+        String nomeUsuario =
+                cliente.getNomeUsuario();
+
+        if (nomeUsuario != null) {
+
+            enviarParaTodos(
+                    "OFFLINE|" + nomeUsuario
+            );
+        }
     }
 
     public synchronized ClienteHandler encontrarCliente(
@@ -47,5 +62,17 @@ public class GerenciadorClientes {
     public synchronized List<ClienteHandler> getClientes() {
 
         return new ArrayList<>(clientes);
+    }
+
+    public synchronized void enviarParaTodos(
+            String mensagem
+    ) {
+
+        for (ClienteHandler cliente : clientes) {
+
+            cliente.enviarMensagem(
+                    mensagem
+            );
+        }
     }
 }

@@ -1,5 +1,6 @@
 package ChatCliente;
 
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -17,7 +18,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javafx.application.Platform;
 
 public class ChatClienteApp
         extends javafx.application.Application {
@@ -36,6 +36,8 @@ public class ChatClienteApp
 
     private VBox mensagens;
 
+    private ListView<String> listaContatos;
+
     private String contatoAtual;
 
     @Override
@@ -53,46 +55,97 @@ public class ChatClienteApp
         loginView.mostrar();
     }
 
-    public void receberMensagemServidor(String mensagem) {
+    public void receberMensagemServidor(
+            String mensagem
+    ) {
 
-    if (!mensagem.startsWith("MESSAGE|")) {
-        return;
-    }
+        if (mensagem.startsWith("MESSAGE|")) {
 
-    String[] partes =
-            mensagem.split("\\|", 3);
+            String[] partes =
+                    mensagem.split("\\|", 3);
 
-    if (partes.length < 3) {
-        return;
-    }
+            if (partes.length < 3) {
+                return;
+            }
 
-    String remetente = partes[1];
-    String conteudo = partes[2];
+            String remetente =
+                    partes[1];
 
-    Mensagem novaMensagem =
-            new Mensagem(
-                    remetente,
-                    conteudo,
-                    false
-            );
+            String conteudo =
+                    partes[2];
 
-    historicoConversas
-            .computeIfAbsent(
-                    remetente,
-                    chave -> new ArrayList<>()
-            )
-            .add(novaMensagem);
+            Mensagem novaMensagem =
+                    new Mensagem(
+                            remetente,
+                            conteudo,
+                            false
+                    );
 
-    Platform.runLater(() -> {
+            historicoConversas
+                    .computeIfAbsent(
+                            remetente,
+                            chave ->
+                                    new ArrayList<>()
+                    )
+                    .add(novaMensagem);
 
-        if (remetente.equals(contatoAtual)) {
+            Platform.runLater(() -> {
 
-            adicionarMensagemNaTela(
-                    novaMensagem
-            );
+                if (remetente.equals(contatoAtual)) {
+
+                    adicionarMensagemNaTela(
+                            novaMensagem
+                    );
+                }
+            });
+
+            return;
         }
-    });
-}
+
+        if (mensagem.startsWith("ONLINE|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 2);
+
+            if (partes.length < 2) {
+                return;
+            }
+
+            String nomeUsuario =
+                    partes[1];
+
+            Platform.runLater(() -> {
+
+                atualizarStatusContato(
+                        nomeUsuario,
+                        true
+                );
+            });
+
+            return;
+        }
+
+        if (mensagem.startsWith("OFFLINE|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 2);
+
+            if (partes.length < 2) {
+                return;
+            }
+
+            String nomeUsuario =
+                    partes[1];
+
+            Platform.runLater(() -> {
+
+                atualizarStatusContato(
+                        nomeUsuario,
+                        false
+                );
+            });
+        }
+    }
 
     public void mostrarChat(Stage stage) {
 
@@ -108,12 +161,12 @@ public class ChatClienteApp
         Label tituloContatos =
                 new Label("CONTATOS");
 
-        ListView<String> listaContatos =
+        listaContatos =
                 new ListView<>();
 
         listaContatos.getItems().addAll(
-                "🟢 João",
-                "🟢 Maria",
+                "⚫ João",
+                "⚫ Maria",
                 "⚫ Carlos"
         );
 
@@ -277,6 +330,51 @@ public class ChatClienteApp
 
         stage.setScene(scene);
         stage.show();
+    }
+
+    private void atualizarStatusContato(
+            String nomeUsuario,
+            boolean online
+    ) {
+
+        if (listaContatos == null) {
+            return;
+        }
+
+        for (int i = 0;
+             i < listaContatos.getItems().size();
+             i++) {
+
+            String contato =
+                    listaContatos
+                            .getItems()
+                            .get(i);
+
+            String nome =
+                    removerStatus(contato);
+
+            if (nome.equalsIgnoreCase(
+                    nomeUsuario
+            )) {
+
+                String novoStatus;
+
+                if (online) {
+                    novoStatus = "🟢 ";
+                } else {
+                    novoStatus = "⚫ ";
+                }
+
+                listaContatos
+                        .getItems()
+                        .set(
+                                i,
+                                novoStatus + nome
+                        );
+
+                break;
+            }
+        }
     }
 
     private void enviarMensagem(
