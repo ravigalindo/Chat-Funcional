@@ -12,7 +12,6 @@ public class ClienteHandler implements Runnable {
     private final GerenciadorClientes gerenciador;
 
     private String nomeUsuario;
-
     private PrintWriter saida;
 
     public ClienteHandler(
@@ -25,8 +24,6 @@ public class ClienteHandler implements Runnable {
 
     @Override
     public void run() {
-
-        gerenciador.adicionarCliente(this);
 
         try (
                 BufferedReader entrada = new BufferedReader(
@@ -68,6 +65,7 @@ public class ClienteHandler implements Runnable {
             try {
                 cliente.close();
             } catch (IOException e) {
+
                 System.out.println(
                         "Erro ao fechar conexão."
                 );
@@ -80,70 +78,27 @@ public class ClienteHandler implements Runnable {
         }
     }
 
-    private void processarMensagem(String mensagem) {
+    private void processarMensagem(
+            String mensagem
+    ) {
 
-        String[] partes = mensagem.split("\\|", 3);
+        String[] partes =
+                mensagem.split("\\|", 3);
 
-        String comando = partes[0];
+        String comando =
+                partes[0];
 
         switch (comando) {
 
             case "LOGIN":
 
-                if (partes.length < 2) {
-                    saida.println("ERRO|Nome de usuário inválido");
-                    return;
-                }
-
-                nomeUsuario = partes[1];
-
-                System.out.println(
-                        "Usuário identificado como: "
-                                + nomeUsuario
-                );
-
-                saida.println(
-                        "LOGIN_OK|" + nomeUsuario
-                );
+                processarLogin(partes);
 
                 break;
 
             case "MESSAGE":
 
-                if (partes.length < 3) {
-                    saida.println(
-                            "ERRO|Mensagem inválida"
-                    );
-                    return;
-                }
-
-                String destinatario = partes[1];
-                String conteudo = partes[2];
-
-                ClienteHandler clienteDestino =
-                        gerenciador.encontrarCliente(
-                                destinatario
-                        );
-
-                if (clienteDestino == null) {
-
-                    saida.println(
-                            "ERRO|Usuário não encontrado"
-                    );
-
-                    return;
-                }
-
-                clienteDestino.enviarMensagem(
-                        "MESSAGE|"
-                                + nomeUsuario
-                                + "|"
-                                + conteudo
-                );
-
-                saida.println(
-                        "MESSAGE_SENT"
-                );
+                processarMensagemChat(partes);
 
                 break;
 
@@ -155,10 +110,96 @@ public class ClienteHandler implements Runnable {
         }
     }
 
-    public void enviarMensagem(String mensagem) {
+    private void processarLogin(
+            String[] partes
+    ) {
+
+        if (partes.length < 2) {
+
+            saida.println(
+                    "ERRO|Nome de usuário inválido"
+            );
+
+            return;
+        }
+
+        nomeUsuario =
+                partes[1];
+
+        System.out.println(
+                "Usuário identificado como: "
+                        + nomeUsuario
+        );
+
+        gerenciador.adicionarCliente(
+                this
+        );
+
+        saida.println(
+                "LOGIN_OK|"
+                        + nomeUsuario
+        );
+
+        gerenciador.enviarParaTodos(
+                "ONLINE|"
+                        + nomeUsuario
+        );
+    }
+
+    private void processarMensagemChat(
+            String[] partes
+    ) {
+
+        if (partes.length < 3) {
+
+            saida.println(
+                    "ERRO|Mensagem inválida"
+            );
+
+            return;
+        }
+
+        String destinatario =
+                partes[1];
+
+        String conteudo =
+                partes[2];
+
+        ClienteHandler clienteDestino =
+                gerenciador.encontrarCliente(
+                        destinatario
+                );
+
+        if (clienteDestino == null) {
+
+            saida.println(
+                    "ERRO|Usuário não encontrado"
+            );
+
+            return;
+        }
+
+        clienteDestino.enviarMensagem(
+                "MESSAGE|"
+                        + nomeUsuario
+                        + "|"
+                        + conteudo
+        );
+
+        saida.println(
+                "MESSAGE_SENT"
+        );
+    }
+
+    public void enviarMensagem(
+            String mensagem
+    ) {
 
         if (saida != null) {
-            saida.println(mensagem);
+
+            saida.println(
+                    mensagem
+            );
         }
     }
 
