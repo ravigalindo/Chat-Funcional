@@ -17,14 +17,19 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javafx.application.Platform;
 
-public class ChatClienteApp extends javafx.application.Application {
+public class ChatClienteApp
+        extends javafx.application.Application {
 
     private final GerenciadorUsuarios gerenciadorUsuarios =
             new GerenciadorUsuarios();
 
     private final Sessao sessao =
             new Sessao();
+
+    private final ClienteTCP clienteTCP =
+            new ClienteTCP();
 
     private final Map<String, List<Mensagem>> historicoConversas =
             new HashMap<>();
@@ -41,11 +46,53 @@ public class ChatClienteApp extends javafx.application.Application {
                         stage,
                         this,
                         gerenciadorUsuarios,
-                        sessao
+                        sessao,
+                        clienteTCP
                 );
 
         loginView.mostrar();
     }
+
+    public void receberMensagemServidor(String mensagem) {
+
+    if (!mensagem.startsWith("MESSAGE|")) {
+        return;
+    }
+
+    String[] partes =
+            mensagem.split("\\|", 3);
+
+    if (partes.length < 3) {
+        return;
+    }
+
+    String remetente = partes[1];
+    String conteudo = partes[2];
+
+    Mensagem novaMensagem =
+            new Mensagem(
+                    remetente,
+                    conteudo,
+                    false
+            );
+
+    historicoConversas
+            .computeIfAbsent(
+                    remetente,
+                    chave -> new ArrayList<>()
+            )
+            .add(novaMensagem);
+
+    Platform.runLater(() -> {
+
+        if (remetente.equals(contatoAtual)) {
+
+            adicionarMensagemNaTela(
+                    novaMensagem
+            );
+        }
+    });
+}
 
     public void mostrarChat(Stage stage) {
 
@@ -54,7 +101,8 @@ public class ChatClienteApp extends javafx.application.Application {
 
         Label usuarioLogadoLabel =
                 new Label(
-                        "👤 " + usuarioLogado.getNome()
+                        "👤 "
+                                + usuarioLogado.getNome()
                 );
 
         Label tituloContatos =
@@ -70,7 +118,9 @@ public class ChatClienteApp extends javafx.application.Application {
         );
 
         Label nomeContato =
-                new Label("Selecione um contato");
+                new Label(
+                        "Selecione um contato"
+                );
 
         mensagens =
                 new VBox(10);
@@ -80,9 +130,13 @@ public class ChatClienteApp extends javafx.application.Application {
         );
 
         ScrollPane scrollMensagens =
-                new ScrollPane(mensagens);
+                new ScrollPane(
+                        mensagens
+                );
 
-        scrollMensagens.setFitToWidth(true);
+        scrollMensagens.setFitToWidth(
+                true
+        );
 
         TextField campoMensagem =
                 new TextField();
@@ -95,11 +149,17 @@ public class ChatClienteApp extends javafx.application.Application {
                 new Button("Enviar");
 
         botaoEnviar.setOnAction(event -> {
-            enviarMensagem(campoMensagem);
+
+            enviarMensagem(
+                    campoMensagem
+            );
         });
 
         campoMensagem.setOnAction(event -> {
-            enviarMensagem(campoMensagem);
+
+            enviarMensagem(
+                    campoMensagem
+            );
         });
 
         HBox campoEnvio =
@@ -121,7 +181,8 @@ public class ChatClienteApp extends javafx.application.Application {
         listaContatos.setOnMouseClicked(event -> {
 
             String contatoSelecionado =
-                    listaContatos.getSelectionModel()
+                    listaContatos
+                            .getSelectionModel()
                             .getSelectedItem();
 
             if (contatoSelecionado != null) {
@@ -150,7 +211,9 @@ public class ChatClienteApp extends javafx.application.Application {
                 new Insets(15)
         );
 
-        painelContatos.setPrefWidth(200);
+        painelContatos.setPrefWidth(
+                200
+        );
 
         BorderPane painelConversa =
                 new BorderPane();
@@ -213,7 +276,6 @@ public class ChatClienteApp extends javafx.application.Application {
         );
 
         stage.setScene(scene);
-
         stage.show();
     }
 
@@ -226,15 +288,24 @@ public class ChatClienteApp extends javafx.application.Application {
         }
 
         String texto =
-                campoMensagem.getText().trim();
+                campoMensagem
+                        .getText()
+                        .trim();
 
         if (texto.isEmpty()) {
             return;
         }
 
+        clienteTCP.enviarMensagem(
+                contatoAtual,
+                texto
+        );
+
         Mensagem mensagem =
                 new Mensagem(
-                        sessao.getUsuarioLogado().getNome(),
+                        sessao
+                                .getUsuarioLogado()
+                                .getNome(),
                         texto,
                         true
                 );
@@ -242,7 +313,8 @@ public class ChatClienteApp extends javafx.application.Application {
         historicoConversas
                 .computeIfAbsent(
                         contatoAtual,
-                        chave -> new ArrayList<>()
+                        chave ->
+                                new ArrayList<>()
                 )
                 .add(mensagem);
 
@@ -257,7 +329,6 @@ public class ChatClienteApp extends javafx.application.Application {
             Mensagem mensagem
     ) {
 
-        // Nome do remetente
         Label remetente =
                 new Label(
                         mensagem.getRemetente()
@@ -267,17 +338,19 @@ public class ChatClienteApp extends javafx.application.Application {
                 "-fx-font-weight: bold;"
         );
 
-        // Conteúdo da mensagem
         Label conteudo =
                 new Label(
                         mensagem.getConteudo()
                 );
 
-        conteudo.setWrapText(true);
+        conteudo.setWrapText(
+                true
+        );
 
-        conteudo.setMaxWidth(350);
+        conteudo.setMaxWidth(
+                350
+        );
 
-        // Balão da mensagem
         VBox balaoMensagem =
                 new VBox(
                         3,
@@ -289,21 +362,27 @@ public class ChatClienteApp extends javafx.application.Application {
                 new Insets(10)
         );
 
-        balaoMensagem.setMaxWidth(400);
+        balaoMensagem.setMaxWidth(
+                400
+        );
 
         balaoMensagem.setStyle(
                 "-fx-background-color: #E8E8E8;"
-                + "-fx-background-radius: 10;"
+                        + "-fx-background-radius: 10;"
         );
 
-        // Container responsável pelo alinhamento
         HBox linhaMensagem =
                 new HBox(
                         balaoMensagem
                 );
 
         linhaMensagem.setPadding(
-                new Insets(3, 0, 3, 0)
+                new Insets(
+                        3,
+                        0,
+                        3,
+                        0
+                )
         );
 
         if (mensagem.isEnviadaPorMim()) {
@@ -314,7 +393,7 @@ public class ChatClienteApp extends javafx.application.Application {
 
             balaoMensagem.setStyle(
                     "-fx-background-color: #DCF8C6;"
-                    + "-fx-background-radius: 10;"
+                            + "-fx-background-radius: 10;"
             );
 
         } else {
@@ -331,7 +410,9 @@ public class ChatClienteApp extends javafx.application.Application {
 
     private void carregarHistorico() {
 
-        mensagens.getChildren().clear();
+        mensagens
+                .getChildren()
+                .clear();
 
         List<Mensagem> historico =
                 historicoConversas.get(
@@ -361,6 +442,7 @@ public class ChatClienteApp extends javafx.application.Application {
     }
 
     public static void main(String[] args) {
+
         launch();
     }
 }

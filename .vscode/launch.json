@@ -3,6 +3,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "ChatServidor",
+            "request": "launch",
+            "mainClass": "ChatServidor.ChatServidor",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
             "name": "Executar ChatClienteApp",
             "request": "launch",
             "mainClass": "ChatCliente.ChatClienteApp",

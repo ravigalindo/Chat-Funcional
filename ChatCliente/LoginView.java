@@ -16,31 +16,26 @@ public class LoginView {
     private final ChatClienteApp aplicativo;
     private final GerenciadorUsuarios gerenciadorUsuarios;
     private final Sessao sessao;
+    private final ClienteTCP clienteTCP;
 
     public LoginView(
             Stage stage,
             ChatClienteApp aplicativo,
             GerenciadorUsuarios gerenciadorUsuarios,
-            Sessao sessao
+            Sessao sessao,
+            ClienteTCP clienteTCP
     ) {
         this.stage = stage;
         this.aplicativo = aplicativo;
         this.gerenciadorUsuarios = gerenciadorUsuarios;
         this.sessao = sessao;
+        this.clienteTCP = clienteTCP;
     }
 
     public void mostrar() {
 
-        // ==========================================
-        // TÍTULO
-        // ==========================================
-
         Label titulo =
                 new Label("CHAT DE SEGURANÇA");
-
-        // ==========================================
-        // USUÁRIO
-        // ==========================================
 
         Label labelUsuario =
                 new Label("Usuário");
@@ -52,10 +47,6 @@ public class LoginView {
                 "Digite seu usuário"
         );
 
-        // ==========================================
-        // SENHA
-        // ==========================================
-
         Label labelSenha =
                 new Label("Senha");
 
@@ -66,16 +57,8 @@ public class LoginView {
                 "Digite sua senha"
         );
 
-        // ==========================================
-        // MENSAGEM DE STATUS
-        // ==========================================
-
         Label mensagemStatus =
                 new Label();
-
-        // ==========================================
-        // BOTÃO ENTRAR
-        // ==========================================
 
         Button botaoEntrar =
                 new Button("Entrar");
@@ -89,30 +72,67 @@ public class LoginView {
                     campoSenha.getText();
 
             Usuario usuarioAutenticado =
-                    gerenciadorUsuarios.obterUsuarioAutenticado(
-                            usuario,
-                            senha
+                    gerenciadorUsuarios
+                            .obterUsuarioAutenticado(
+                                    usuario,
+                                    senha
+                            );
+
+            if (usuarioAutenticado == null) {
+
+                mensagemStatus.setText(
+                        "Usuário ou senha incorretos."
+                );
+
+                return;
+            }
+
+            boolean conectado =
+                    clienteTCP.conectar();
+
+            if (!conectado) {
+
+                mensagemStatus.setText(
+                        "Não foi possível conectar ao servidor."
+                );
+
+                return;
+            }
+
+            String resposta =
+                    clienteTCP.fazerLogin(
+                            usuarioAutenticado.getNome()
                     );
 
-            if (usuarioAutenticado != null) {
+            if (resposta != null &&
+                    resposta.startsWith("LOGIN_OK|")) {
 
                 sessao.iniciarSessao(
                         usuarioAutenticado
                 );
 
-                aplicativo.mostrarChat(stage);
+                clienteTCP.iniciarRecebimento(
+                        mensagem -> {
+
+                            aplicativo.receberMensagemServidor(
+                                    mensagem
+                            );
+                        }
+                );
+
+                aplicativo.mostrarChat(
+                        stage
+                );
 
             } else {
 
                 mensagemStatus.setText(
-                        "Usuário ou senha incorretos."
+                        "Servidor recusou o login."
                 );
+
+                clienteTCP.desconectar();
             }
         });
-
-        // ==========================================
-        // BOTÃO CADASTRO
-        // ==========================================
 
         Button botaoCadastro =
                 new Button("Criar uma conta");
@@ -128,10 +148,6 @@ public class LoginView {
 
             cadastroView.mostrar();
         });
-
-        // ==========================================
-        // LAYOUT
-        // ==========================================
 
         VBox layout =
                 new VBox(
@@ -156,10 +172,6 @@ public class LoginView {
 
         layout.setPrefWidth(400);
 
-        // ==========================================
-        // CENA
-        // ==========================================
-
         Scene scene =
                 new Scene(
                         layout,
@@ -167,17 +179,11 @@ public class LoginView {
                         500
                 );
 
-        // ==========================================
-        // JANELA
-        // ==========================================
-
         stage.setTitle(
                 "Login - Chat"
         );
 
         stage.setScene(scene);
-
         stage.show();
     }
 }
-
