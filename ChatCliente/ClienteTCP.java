@@ -150,6 +150,34 @@ public class ClienteTCP {
         );
     }
 
+    public void enviarDigitacao(
+            String destinatario
+    ) {
+
+        if (saida == null) {
+            return;
+        }
+
+        saida.println(
+                "TYPING|"
+                        + destinatario
+        );
+    }
+
+    public void enviarParadaDigitacao(
+            String destinatario
+    ) {
+
+        if (saida == null) {
+            return;
+        }
+
+        saida.println(
+                "STOP_TYPING|"
+                        + destinatario
+        );
+    }
+
     public void desconectar() {
 
         try {

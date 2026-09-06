@@ -102,6 +102,18 @@ public class ClienteHandler implements Runnable {
 
                 break;
 
+            case "TYPING":
+
+                processarDigitacao(partes);
+
+                break;
+
+            case "STOP_TYPING":
+
+                processarParadaDigitacao(partes);
+
+                break;
+
             default:
 
                 saida.println(
@@ -111,51 +123,62 @@ public class ClienteHandler implements Runnable {
     }
 
     private void processarLogin(
-        String[] partes
-) {
+            String[] partes
+    ) {
 
-    if (partes.length < 2) {
+        if (partes.length < 2) {
 
-        saida.println(
-                "ERRO|Nome de usuário inválido"
+            saida.println(
+                    "ERRO|Nome de usuário inválido"
+            );
+
+            return;
+        }
+
+        nomeUsuario =
+                partes[1];
+
+        System.out.println(
+                "Usuário identificado como: "
+                        + nomeUsuario
         );
 
-        return;
+        gerenciador.adicionarCliente(
+                this
+        );
+
+        /*
+         * Primeiro confirma o login.
+         */
+        saida.println(
+                "LOGIN_OK|"
+                        + nomeUsuario
+        );
+
+        /*
+         * Depois envia a lista atualizada
+         * de usuários para TODOS os clientes.
+         *
+         * Isso faz com que tanto quem acabou
+         * de entrar quanto quem já estava
+         * conectado recebam a nova lista.
+         */
+        String usuariosOnline =
+                gerenciador.obterUsuariosOnline();
+
+        gerenciador.enviarParaTodos(
+                "USERS|"
+                        + usuariosOnline
+        );
+
+        /*
+         * Avisa que este usuário entrou.
+         */
+        gerenciador.enviarParaTodos(
+                "ONLINE|"
+                        + nomeUsuario
+        );
     }
-
-    nomeUsuario =
-            partes[1];
-
-    System.out.println(
-            "Usuário identificado como: "
-                    + nomeUsuario
-    );
-
-    gerenciador.adicionarCliente(
-            this
-    );
-
-    // Primeiro confirma o login
-    saida.println(
-            "LOGIN_OK|"
-                    + nomeUsuario
-    );
-
-    // Depois envia a lista de usuários online
-    String usuariosOnline =
-            gerenciador.obterUsuariosOnline();
-
-    saida.println(
-            "USERS|"
-                    + usuariosOnline
-    );
-
-    // Avisa os clientes sobre o novo usuário
-    gerenciador.enviarParaTodos(
-            "ONLINE|"
-                    + nomeUsuario
-    );
-}
 
     private void processarMensagemChat(
             String[] partes
@@ -199,6 +222,58 @@ public class ClienteHandler implements Runnable {
 
         saida.println(
                 "MESSAGE_SENT"
+        );
+    }
+
+    private void processarDigitacao(
+            String[] partes
+    ) {
+
+        if (partes.length < 2) {
+            return;
+        }
+
+        String destinatario =
+                partes[1];
+
+        ClienteHandler clienteDestino =
+                gerenciador.encontrarCliente(
+                        destinatario
+                );
+
+        if (clienteDestino == null) {
+            return;
+        }
+
+        clienteDestino.enviarMensagem(
+                "TYPING|"
+                        + nomeUsuario
+        );
+    }
+
+    private void processarParadaDigitacao(
+            String[] partes
+    ) {
+
+        if (partes.length < 2) {
+            return;
+        }
+
+        String destinatario =
+                partes[1];
+
+        ClienteHandler clienteDestino =
+                gerenciador.encontrarCliente(
+                        destinatario
+                );
+
+        if (clienteDestino == null) {
+            return;
+        }
+
+        clienteDestino.enviarMensagem(
+                "STOP_TYPING|"
+                        + nomeUsuario
         );
     }
 
