@@ -3,36 +3,28 @@ package ChatCliente;
 import javafx.application.Platform;
 
 import javafx.geometry.Insets;
-
 import javafx.geometry.Pos;
 
 import javafx.scene.Scene;
 
 import javafx.scene.control.Button;
-
 import javafx.scene.control.Label;
-
 import javafx.scene.control.ListView;
-
 import javafx.scene.control.ScrollPane;
-
 import javafx.scene.control.TextField;
 
 import javafx.scene.layout.BorderPane;
-
 import javafx.scene.layout.HBox;
-
 import javafx.scene.layout.VBox;
 
 import javafx.stage.Stage;
 
 import java.util.ArrayList;
-
 import java.util.HashMap;
-
 import java.util.List;
-
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class ChatClienteApp
         extends javafx.application.Application {
@@ -54,6 +46,10 @@ public class ChatClienteApp
     private ListView<String> listaContatos;
 
     private String contatoAtual;
+
+    private Timer timerDigitacao;
+
+    private Label indicadorDigitacao;
 
     @Override
     public void start(Stage stage) {
@@ -117,10 +113,6 @@ public class ChatClienteApp
             return;
         }
 
-        /*
-         * Recebe a lista inicial de usuários
-         * que estão online.
-         */
         if (mensagem.startsWith("USERS|")) {
 
             String[] partes =
@@ -138,6 +130,81 @@ public class ChatClienteApp
                 atualizarListaContatos(
                         usuarios
                 );
+            });
+
+            return;
+        }
+
+        /*
+         * Recebe o aviso de que o outro usuário
+         * começou a digitar.
+         */
+        if (mensagem.startsWith("TYPING|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 2);
+
+            if (partes.length < 2) {
+                return;
+            }
+
+            String nomeUsuario =
+                    partes[1].trim();
+
+            System.out.println(
+                    "DIGITANDO recebido de: "
+                            + nomeUsuario
+            );
+
+            Platform.runLater(() -> {
+
+                if (contatoAtual != null
+                        && nomeUsuario.equalsIgnoreCase(
+                                contatoAtual
+                        )) {
+
+                    indicadorDigitacao.setText(
+                            nomeUsuario
+                                    + " está digitando..."
+                    );
+                }
+            });
+
+            return;
+        }
+
+        /*
+         * Recebe o aviso de que o outro usuário
+         * parou de digitar.
+         */
+        if (mensagem.startsWith("STOP_TYPING|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 2);
+
+            if (partes.length < 2) {
+                return;
+            }
+
+            String nomeUsuario =
+                    partes[1].trim();
+
+            System.out.println(
+                    "PAROU DE DIGITAR recebido de: "
+                            + nomeUsuario
+            );
+
+            Platform.runLater(() -> {
+
+                if (contatoAtual != null
+                        && nomeUsuario.equalsIgnoreCase(
+                                contatoAtual
+                        )) {
+
+                    indicadorDigitacao.setText(
+                            ""
+                    );
+                }
             });
 
             return;
@@ -210,6 +277,17 @@ public class ChatClienteApp
                         "Selecione um contato"
                 );
 
+        /*
+         * Indicador de digitação.
+         */
+        indicadorDigitacao =
+                new Label("");
+
+        indicadorDigitacao.setStyle(
+                "-fx-text-fill: #666666;"
+                        + "-fx-font-style: italic;"
+        );
+
         mensagens =
                 new VBox(10);
 
@@ -232,6 +310,23 @@ public class ChatClienteApp
         campoMensagem.setPromptText(
                 "Digite uma mensagem..."
         );
+
+        /*
+         * Detecta quando o usuário começa
+         * ou continua digitando.
+         */
+        campoMensagem.setOnKeyTyped(event -> {
+
+            if (contatoAtual == null) {
+                return;
+            }
+
+            clienteTCP.enviarDigitacao(
+                    contatoAtual
+            );
+
+            iniciarContadorParadaDigitacao();
+        });
 
         Button botaoEnviar =
                 new Button("Enviar");
@@ -284,6 +379,14 @@ public class ChatClienteApp
                         contatoSelecionado
                 );
 
+                /*
+                 * Limpa o indicador ao trocar
+                 * de conversa.
+                 */
+                indicadorDigitacao.setText(
+                        ""
+                );
+
                 carregarHistorico();
             }
         });
@@ -303,11 +406,23 @@ public class ChatClienteApp
                 200
         );
 
+        /*
+         * Cabeçalho da conversa.
+         * Contém o nome do contato e o
+         * indicador de digitação.
+         */
+        VBox cabecalhoConversa =
+                new VBox(
+                        3,
+                        nomeContato,
+                        indicadorDigitacao
+                );
+
         BorderPane painelConversa =
                 new BorderPane();
 
         painelConversa.setTop(
-                nomeContato
+                cabecalhoConversa
         );
 
         painelConversa.setCenter(
@@ -319,7 +434,7 @@ public class ChatClienteApp
         );
 
         BorderPane.setMargin(
-                nomeContato,
+                cabecalhoConversa,
                 new Insets(15)
         );
 
@@ -367,11 +482,6 @@ public class ChatClienteApp
         stage.show();
     }
 
-    /*
-     * Atualiza a lista de contatos usando
-     * os usuários que o servidor informou
-     * como online.
-     */
     private void atualizarListaContatos(
             String usuarios
     ) {
@@ -406,7 +516,6 @@ public class ChatClienteApp
                 continue;
             }
 
-            // Não adiciona o próprio usuário
             if (nomeUsuario.equalsIgnoreCase(
                     meuNome
             )) {
@@ -467,6 +576,36 @@ public class ChatClienteApp
         }
     }
 
+    private void iniciarContadorParadaDigitacao() {
+
+        if (timerDigitacao != null) {
+
+            timerDigitacao.cancel();
+        }
+
+        timerDigitacao =
+                new Timer();
+
+        timerDigitacao.schedule(
+                new TimerTask() {
+
+                    @Override
+                    public void run() {
+
+                        if (contatoAtual != null) {
+
+                            clienteTCP
+                                    .enviarParadaDigitacao(
+                                            contatoAtual
+                                    );
+                        }
+                    }
+
+                },
+                1000
+        );
+    }
+
     private void enviarMensagem(
             TextField campoMensagem
     ) {
@@ -483,6 +622,15 @@ public class ChatClienteApp
         if (texto.isEmpty()) {
             return;
         }
+
+        if (timerDigitacao != null) {
+
+            timerDigitacao.cancel();
+        }
+
+        clienteTCP.enviarParadaDigitacao(
+                contatoAtual
+        );
 
         clienteTCP.enviarMensagem(
                 contatoAtual,
