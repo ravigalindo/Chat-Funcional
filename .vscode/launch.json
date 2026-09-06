@@ -3,6 +3,20 @@
     "configurations": [
         {
             "type": "java",
+            "name": "GerenciadorUsuariosBanco",
+            "request": "launch",
+            "mainClass": "ChatServidor.GerenciadorUsuariosBanco",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
+            "name": "ConexaoSQLite",
+            "request": "launch",
+            "mainClass": "ChatServidor.ConexaoSQLite",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
             "name": "ChatServidor",
             "request": "launch",
             "mainClass": "ChatServidor.ChatServidor",

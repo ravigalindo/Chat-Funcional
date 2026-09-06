@@ -10,13 +10,26 @@ public class ChatServidor {
 
     public static void main(String[] args) {
 
-        System.out.println("Iniciando servidor...");
+        System.out.println(
+                "Iniciando servidor..."
+        );
 
-        GerenciadorClientes gerenciador =
+        /*
+         * Garante que o banco e as tabelas
+         * existam antes de aceitar clientes.
+         */
+        ConexaoSQLite.criarTabelas();
+
+        GerenciadorClientes gerenciadorClientes =
                 new GerenciadorClientes();
 
-        try (ServerSocket servidor =
-                     new ServerSocket(PORTA)) {
+        GerenciadorUsuariosBanco gerenciadorUsuariosBanco =
+                new GerenciadorUsuariosBanco();
+
+        try (
+                ServerSocket servidor =
+                        new ServerSocket(PORTA)
+        ) {
 
             System.out.println(
                     "Servidor iniciado na porta "
@@ -39,7 +52,8 @@ public class ChatServidor {
                 ClienteHandler clienteHandler =
                         new ClienteHandler(
                                 cliente,
-                                gerenciador
+                                gerenciadorClientes,
+                                gerenciadorUsuariosBanco
                         );
 
                 Thread thread =

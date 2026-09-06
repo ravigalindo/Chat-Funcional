@@ -24,10 +24,11 @@ public class ClienteTCP {
 
         try {
 
-            socket = new Socket(
-                    HOST,
-                    PORTA
-            );
+            socket =
+                    new Socket(
+                            HOST,
+                            PORTA
+                    );
 
             entrada =
                     new BufferedReader(
@@ -55,8 +56,9 @@ public class ClienteTCP {
         }
     }
 
-    public String fazerLogin(
-            String nomeUsuario
+    public String cadastrarUsuario(
+            String nomeUsuario,
+            String senha
     ) {
 
         if (saida == null) {
@@ -64,7 +66,41 @@ public class ClienteTCP {
         }
 
         saida.println(
-                "LOGIN|" + nomeUsuario
+                "REGISTER|"
+                        + nomeUsuario
+                        + "|"
+                        + senha
+        );
+
+        try {
+
+            return entrada.readLine();
+
+        } catch (IOException e) {
+
+            System.out.println(
+                    "Erro ao receber resposta do cadastro: "
+                            + e.getMessage()
+            );
+
+            return null;
+        }
+    }
+
+    public String fazerLogin(
+            String nomeUsuario,
+            String senha
+    ) {
+
+        if (saida == null) {
+            return null;
+        }
+
+        saida.println(
+                "LOGIN|"
+                        + nomeUsuario
+                        + "|"
+                        + senha
         );
 
         try {
