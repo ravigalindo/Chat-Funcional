@@ -14,31 +14,22 @@ public class CadastroView {
 
     private final Stage stage;
     private final LoginView loginView;
-    private final GerenciadorUsuarios gerenciadorUsuarios;
+    private final ClienteTCP clienteTCP;
 
-   public CadastroView(
-        Stage stage,
-        LoginView loginView,
-        GerenciadorUsuarios gerenciadorUsuarios
-) {
-    this.stage = stage;
-    this.loginView = loginView;
-    this.gerenciadorUsuarios =
-            gerenciadorUsuarios;
-}
+    public CadastroView(
+            Stage stage,
+            LoginView loginView,
+            ClienteTCP clienteTCP
+    ) {
+        this.stage = stage;
+        this.loginView = loginView;
+        this.clienteTCP = clienteTCP;
+    }
 
     public void mostrar() {
 
-        // ==========================================
-        // TÍTULO
-        // ==========================================
-
         Label titulo =
                 new Label("CRIAR CONTA");
-
-        // ==========================================
-        // USUÁRIO
-        // ==========================================
 
         Label labelUsuario =
                 new Label("Usuário");
@@ -50,10 +41,6 @@ public class CadastroView {
                 "Digite seu usuário"
         );
 
-        // ==========================================
-        // SENHA
-        // ==========================================
-
         Label labelSenha =
                 new Label("Senha");
 
@@ -63,10 +50,6 @@ public class CadastroView {
         campoSenha.setPromptText(
                 "Digite sua senha"
         );
-
-        // ==========================================
-        // CONFIRMAR SENHA
-        // ==========================================
 
         Label labelConfirmarSenha =
                 new Label("Confirmar senha");
@@ -78,16 +61,8 @@ public class CadastroView {
                 "Digite a senha novamente"
         );
 
-        // ==========================================
-        // MENSAGEM DE STATUS
-        // ==========================================
-
         Label mensagemStatus =
                 new Label();
-
-        // ==========================================
-        // BOTÃO CADASTRAR
-        // ==========================================
 
         Button botaoCadastrar =
                 new Button("Cadastrar");
@@ -95,13 +70,17 @@ public class CadastroView {
         botaoCadastrar.setOnAction(event -> {
 
             String usuario =
-                    campoUsuario.getText().trim();
+                    campoUsuario
+                            .getText()
+                            .trim();
 
             String senha =
-                    campoSenha.getText();
+                    campoSenha
+                            .getText();
 
             String confirmarSenha =
-                    campoConfirmarSenha.getText();
+                    campoConfirmarSenha
+                            .getText();
 
             if (usuario.isEmpty()) {
 
@@ -130,28 +109,61 @@ public class CadastroView {
                 return;
             }
 
-            boolean cadastrado =
-        gerenciadorUsuarios.cadastrarUsuario(
-                usuario,
-                senha
-        );
+            boolean conectado =
+                    clienteTCP.conectar();
 
-if (!cadastrado) {
+            if (!conectado) {
 
-    mensagemStatus.setText(
-            "Esse usuário já existe."
-    );
+                mensagemStatus.setText(
+                        "Não foi possível conectar ao servidor."
+                );
 
-    return;
-}
-            mensagemStatus.setText(
-                    "Cadastro realizado com sucesso!"
-            );
+                return;
+            }
+
+            String resposta =
+                    clienteTCP.cadastrarUsuario(
+                            usuario,
+                            senha
+                    );
+
+            if (
+                    resposta != null
+                            && resposta.equals(
+                                    "REGISTER_OK"
+                            )
+            ) {
+
+                mensagemStatus.setText(
+                        "Cadastro realizado com sucesso!"
+                );
+
+                clienteTCP.desconectar();
+
+            } else if (
+                    resposta != null
+                            && resposta.startsWith(
+                                    "REGISTER_ERROR|"
+                            )
+            ) {
+
+                mensagemStatus.setText(
+                        resposta.substring(
+                                "REGISTER_ERROR|".length()
+                        )
+                );
+
+                clienteTCP.desconectar();
+
+            } else {
+
+                mensagemStatus.setText(
+                        "Erro ao realizar cadastro."
+                );
+
+                clienteTCP.desconectar();
+            }
         });
-
-        // ==========================================
-        // BOTÃO VOLTAR
-        // ==========================================
 
         Button botaoVoltar =
                 new Button("Voltar para o login");
@@ -160,10 +172,6 @@ if (!cadastrado) {
 
             loginView.mostrar();
         });
-
-        // ==========================================
-        // LAYOUT
-        // ==========================================
 
         VBox layout =
                 new VBox(
@@ -188,11 +196,9 @@ if (!cadastrado) {
                 Pos.CENTER
         );
 
-        layout.setPrefWidth(400);
-
-        // ==========================================
-        // CENA
-        // ==========================================
+        layout.setPrefWidth(
+                400
+        );
 
         Scene scene =
                 new Scene(
@@ -201,16 +207,11 @@ if (!cadastrado) {
                         550
                 );
 
-        // ==========================================
-        // JANELA
-        // ==========================================
-
         stage.setTitle(
                 "Cadastro - Chat"
         );
 
         stage.setScene(scene);
-
         stage.show();
     }
 }

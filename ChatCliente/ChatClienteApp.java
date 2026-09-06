@@ -29,9 +29,6 @@ import java.util.TimerTask;
 public class ChatClienteApp
         extends javafx.application.Application {
 
-    private final GerenciadorUsuarios gerenciadorUsuarios =
-            new GerenciadorUsuarios();
-
     private final Sessao sessao =
             new Sessao();
 
@@ -58,7 +55,6 @@ public class ChatClienteApp
                 new LoginView(
                         stage,
                         this,
-                        gerenciadorUsuarios,
                         sessao,
                         clienteTCP
                 );

@@ -14,20 +14,17 @@ public class LoginView {
 
     private final Stage stage;
     private final ChatClienteApp aplicativo;
-    private final GerenciadorUsuarios gerenciadorUsuarios;
     private final Sessao sessao;
     private final ClienteTCP clienteTCP;
 
     public LoginView(
             Stage stage,
             ChatClienteApp aplicativo,
-            GerenciadorUsuarios gerenciadorUsuarios,
             Sessao sessao,
             ClienteTCP clienteTCP
     ) {
         this.stage = stage;
         this.aplicativo = aplicativo;
-        this.gerenciadorUsuarios = gerenciadorUsuarios;
         this.sessao = sessao;
         this.clienteTCP = clienteTCP;
     }
@@ -66,22 +63,19 @@ public class LoginView {
         botaoEntrar.setOnAction(event -> {
 
             String usuario =
-                    campoUsuario.getText().trim();
+                    campoUsuario
+                            .getText()
+                            .trim();
 
             String senha =
-                    campoSenha.getText();
+                    campoSenha
+                            .getText();
 
-            Usuario usuarioAutenticado =
-                    gerenciadorUsuarios
-                            .obterUsuarioAutenticado(
-                                    usuario,
-                                    senha
-                            );
-
-            if (usuarioAutenticado == null) {
+            if (usuario.isEmpty()
+                    || senha.isEmpty()) {
 
                 mensagemStatus.setText(
-                        "Usuário ou senha incorretos."
+                        "Digite usuário e senha."
                 );
 
                 return;
@@ -101,11 +95,22 @@ public class LoginView {
 
             String resposta =
                     clienteTCP.fazerLogin(
-                            usuarioAutenticado.getNome()
+                            usuario,
+                            senha
                     );
 
-            if (resposta != null &&
-                    resposta.startsWith("LOGIN_OK|")) {
+            if (
+                    resposta != null
+                            && resposta.startsWith(
+                                    "LOGIN_OK|"
+                            )
+            ) {
+
+                Usuario usuarioAutenticado =
+                        new Usuario(
+                                usuario,
+                                senha
+                        );
 
                 sessao.iniciarSessao(
                         usuarioAutenticado
@@ -124,10 +129,25 @@ public class LoginView {
                         stage
                 );
 
+            } else if (
+                    resposta != null
+                            && resposta.startsWith(
+                                    "LOGIN_ERROR|"
+                            )
+            ) {
+
+                mensagemStatus.setText(
+                        resposta.substring(
+                                "LOGIN_ERROR|".length()
+                        )
+                );
+
+                clienteTCP.desconectar();
+
             } else {
 
                 mensagemStatus.setText(
-                        "Servidor recusou o login."
+                        "Servidor não respondeu corretamente."
                 );
 
                 clienteTCP.desconectar();
@@ -143,7 +163,7 @@ public class LoginView {
                     new CadastroView(
                             stage,
                             this,
-                            gerenciadorUsuarios
+                            clienteTCP
                     );
 
             cadastroView.mostrar();
@@ -170,7 +190,9 @@ public class LoginView {
                 Pos.CENTER
         );
 
-        layout.setPrefWidth(400);
+        layout.setPrefWidth(
+                400
+        );
 
         Scene scene =
                 new Scene(
