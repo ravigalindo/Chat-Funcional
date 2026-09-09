@@ -3,6 +3,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "GerenciadorMensagensBanco",
+            "request": "launch",
+            "mainClass": "ChatServidor.GerenciadorMensagensBanco",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
             "name": "GerenciadorUsuariosBanco",
             "request": "launch",
             "mainClass": "ChatServidor.GerenciadorUsuariosBanco",

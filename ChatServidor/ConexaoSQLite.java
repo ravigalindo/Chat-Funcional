@@ -37,21 +37,39 @@ public class ConexaoSQLite {
                 )
                 """;
 
+        String sqlMensagens =
+                """
+                CREATE TABLE IF NOT EXISTS mensagens (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    remetente TEXT NOT NULL,
+                    destinatario TEXT NOT NULL,
+                    conteudo TEXT NOT NULL,
+                    data_hora TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    apagada_remetente INTEGER NOT NULL DEFAULT 0,
+                    apagada_destinatario INTEGER NOT NULL DEFAULT 0
+                )
+                """;
+
         try (
-                Connection conexao = conectar();
-                Statement statement = conexao.createStatement()
+                Connection conexao =
+                        conectar();
+
+                Statement statement =
+                        conexao.createStatement()
         ) {
 
             statement.execute(sqlUsuarios);
 
+            statement.execute(sqlMensagens);
+
             System.out.println(
-                    "Tabela usuarios criada/verificada com sucesso!"
+                    "Tabelas criadas/verificadas com sucesso!"
             );
 
         } catch (SQLException e) {
 
             System.out.println(
-                    "Erro ao criar tabela usuarios:"
+                    "Erro ao criar tabelas:"
             );
 
             e.printStackTrace();

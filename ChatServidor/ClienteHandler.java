@@ -5,6 +5,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 public class ClienteHandler implements Runnable {
 
@@ -123,6 +127,12 @@ public class ClienteHandler implements Runnable {
 
                 break;
 
+            case "HISTORY":
+
+                processarHistorico(partes);
+
+                break;
+
             case "TYPING":
 
                 processarDigitacao(partes);
@@ -238,10 +248,6 @@ public class ClienteHandler implements Runnable {
             return;
         }
 
-        /*
-         * Impede que o mesmo usuário
-         * entre duas vezes simultaneamente.
-         */
         ClienteHandler usuarioConectado =
                 gerenciador.encontrarCliente(
                         nome
@@ -306,30 +312,272 @@ public class ClienteHandler implements Runnable {
         String conteudo =
                 partes[2];
 
-        ClienteHandler clienteDestino =
-                gerenciador.encontrarCliente(
-                        destinatario
-                );
-
-        if (clienteDestino == null) {
+        if (nomeUsuario == null) {
 
             saida.println(
-                    "ERRO|Usuário não encontrado"
+                    "ERRO|Usuário não autenticado"
             );
 
             return;
         }
 
-        clienteDestino.enviarMensagem(
-                "MESSAGE|"
-                        + nomeUsuario
-                        + "|"
-                        + conteudo
-        );
+        if (destinatario == null
+                || destinatario.trim().isEmpty()) {
+
+            saida.println(
+                    "ERRO|Destinatário inválido"
+            );
+
+            return;
+        }
+
+        if (conteudo == null
+                || conteudo.trim().isEmpty()) {
+
+            saida.println(
+                    "ERRO|Mensagem vazia"
+            );
+
+            return;
+        }
+
+        boolean salva =
+                salvarMensagem(
+                        nomeUsuario,
+                        destinatario,
+                        conteudo
+                );
+
+        if (!salva) {
+
+            saida.println(
+                    "ERRO|Não foi possível salvar a mensagem"
+            );
+
+            return;
+        }
+
+        ClienteHandler clienteDestino =
+                gerenciador.encontrarCliente(
+                        destinatario
+                );
+
+        if (clienteDestino != null) {
+
+            clienteDestino.enviarMensagem(
+                    "MESSAGE|"
+                            + nomeUsuario
+                            + "|"
+                            + conteudo
+            );
+        }
 
         saida.println(
                 "MESSAGE_SENT"
         );
+    }
+
+    private boolean salvarMensagem(
+            String remetente,
+            String destinatario,
+            String conteudo
+    ) {
+
+        String sql =
+                """
+                INSERT INTO mensagens
+                (remetente, destinatario, conteudo)
+                VALUES (?, ?, ?)
+                """;
+
+        try (
+                Connection conexao =
+                        ConexaoSQLite.conectar();
+
+                PreparedStatement statement =
+                        conexao.prepareStatement(sql)
+        ) {
+
+            statement.setString(
+                    1,
+                    remetente
+            );
+
+            statement.setString(
+                    2,
+                    destinatario
+            );
+
+            statement.setString(
+                    3,
+                    conteudo
+            );
+
+            statement.executeUpdate();
+
+            System.out.println(
+                    "Mensagem salva no banco: "
+                            + remetente
+                            + " -> "
+                            + destinatario
+            );
+
+            return true;
+
+        } catch (SQLException e) {
+
+            System.out.println(
+                    "Erro ao salvar mensagem:"
+            );
+
+            e.printStackTrace();
+
+            return false;
+        }
+    }
+
+    private void processarHistorico(
+            String[] partes
+    ) {
+
+        if (partes.length < 2) {
+
+            saida.println(
+                    "ERRO|Histórico inválido"
+            );
+
+            return;
+        }
+
+        if (nomeUsuario == null) {
+
+            saida.println(
+                    "ERRO|Usuário não autenticado"
+            );
+
+            return;
+        }
+
+        String outroUsuario =
+                partes[1].trim();
+
+        if (outroUsuario.isEmpty()) {
+
+            saida.println(
+                    "ERRO|Usuário inválido"
+            );
+
+            return;
+        }
+
+        String sql =
+                """
+                SELECT
+                    remetente,
+                    destinatario,
+                    conteudo,
+                    data_hora
+                FROM mensagens
+                WHERE
+                    (remetente = ? AND destinatario = ?)
+                    OR
+                    (remetente = ? AND destinatario = ?)
+                ORDER BY data_hora ASC, id ASC
+                """;
+
+        try (
+                Connection conexao =
+                        ConexaoSQLite.conectar();
+
+                PreparedStatement statement =
+                        conexao.prepareStatement(sql)
+        ) {
+
+            statement.setString(
+                    1,
+                    nomeUsuario
+            );
+
+            statement.setString(
+                    2,
+                    outroUsuario
+            );
+
+            statement.setString(
+                    3,
+                    outroUsuario
+            );
+
+            statement.setString(
+                    4,
+                    nomeUsuario
+            );
+
+            try (
+                    ResultSet resultado =
+                            statement.executeQuery()
+            ) {
+
+                while (
+                        resultado.next()
+                ) {
+
+                    String remetente =
+                            resultado.getString(
+                                    "remetente"
+                            );
+
+                    String destinatario =
+                            resultado.getString(
+                                    "destinatario"
+                            );
+
+                    String conteudo =
+                            resultado.getString(
+                                    "conteudo"
+                            );
+
+                    String dataHora =
+                            resultado.getString(
+                                    "data_hora"
+                            );
+
+                    saida.println(
+                            "HISTORY_MESSAGE|"
+                                    + remetente
+                                    + "|"
+                                    + destinatario
+                                    + "|"
+                                    + conteudo
+                                    + "|"
+                                    + dataHora
+                    );
+                }
+
+                saida.println(
+                        "HISTORY_END"
+                );
+
+                System.out.println(
+                        "Histórico enviado para: "
+                                + nomeUsuario
+                                + " / "
+                                + outroUsuario
+                );
+            }
+
+        } catch (SQLException e) {
+
+            System.out.println(
+                    "Erro ao buscar histórico:"
+            );
+
+            e.printStackTrace();
+
+            saida.println(
+                    "ERRO|Não foi possível carregar o histórico"
+            );
+        }
     }
 
     private void processarDigitacao(
