@@ -1,22 +1,17 @@
 package ChatCliente;
 
 import javafx.application.Platform;
-
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-
 import javafx.scene.Scene;
-
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
-
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-
 import javafx.stage.Stage;
 
 import java.util.ArrayList;
@@ -105,6 +100,105 @@ public class ChatClienteApp
                     );
                 }
             });
+
+            return;
+        }
+
+        if (mensagem.startsWith("HISTORY_MESSAGE|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 5);
+
+            if (partes.length < 5) {
+                return;
+            }
+
+            String remetente =
+                    partes[1];
+
+            String destinatario =
+                    partes[2];
+
+            String conteudo =
+                    partes[3];
+
+            String dataHora =
+                    partes[4];
+
+            String meuNome =
+                    sessao
+                            .getUsuarioLogado()
+                            .getNome();
+
+            boolean enviadaPorMim =
+                    remetente.equalsIgnoreCase(
+                            meuNome
+                    );
+
+            String contato;
+
+            if (remetente.equalsIgnoreCase(
+                    meuNome
+            )) {
+
+                contato =
+                        destinatario;
+
+            } else {
+
+                contato =
+                        remetente;
+            }
+
+            Mensagem mensagemHistorico =
+                    new Mensagem(
+                            remetente,
+                            conteudo,
+                            enviadaPorMim
+                    );
+
+            historicoConversas
+                    .computeIfAbsent(
+                            contato,
+                            chave ->
+                                    new ArrayList<>()
+                    )
+                    .add(
+                            mensagemHistorico
+                    );
+
+            Platform.runLater(() -> {
+
+                if (contatoAtual != null
+                        && contato.equalsIgnoreCase(
+                                contatoAtual
+                        )) {
+
+                    adicionarMensagemNaTela(
+                            mensagemHistorico
+                    );
+                }
+            });
+
+            System.out.println(
+                    "Histórico recebido: "
+                            + dataHora
+                            + " | "
+                            + remetente
+                            + " -> "
+                            + destinatario
+                            + " | "
+                            + conteudo
+            );
+
+            return;
+        }
+
+        if (mensagem.equals("HISTORY_END")) {
+
+            System.out.println(
+                    "Fim do histórico."
+            );
 
             return;
         }
@@ -746,22 +840,26 @@ public class ChatClienteApp
                 .getChildren()
                 .clear();
 
-        List<Mensagem> historico =
-                historicoConversas.get(
-                        contatoAtual
-                );
-
-        if (historico == null) {
+        if (contatoAtual == null) {
             return;
         }
 
-        for (Mensagem mensagem :
-                historico) {
+        /*
+         * Remove o histórico que estava
+         * temporariamente na memória para
+         * reconstruí-lo a partir do banco.
+         */
+        historicoConversas.remove(
+                contatoAtual
+        );
 
-            adicionarMensagemNaTela(
-                    mensagem
-            );
-        }
+        /*
+         * Solicita ao servidor todas as
+         * mensagens dessa conversa.
+         */
+        clienteTCP.solicitarHistorico(
+                contatoAtual
+        );
     }
 
     private String removerStatus(

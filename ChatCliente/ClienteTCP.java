@@ -186,6 +186,20 @@ public class ClienteTCP {
         );
     }
 
+    public void solicitarHistorico(
+            String usuario
+    ) {
+
+        if (saida == null) {
+            return;
+        }
+
+        saida.println(
+                "HISTORY|"
+                        + usuario
+        );
+    }
+
     public void enviarDigitacao(
             String destinatario
     ) {
