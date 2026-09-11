@@ -1,24 +1,45 @@
 package ChatCliente;
 
 import javafx.application.Platform;
+
 import javafx.geometry.Insets;
+
 import javafx.geometry.Pos;
+
 import javafx.scene.Scene;
+
 import javafx.scene.control.Button;
+
+import javafx.scene.control.ContextMenu;
+
 import javafx.scene.control.Label;
+
 import javafx.scene.control.ListView;
+
+import javafx.scene.control.MenuItem;
+
 import javafx.scene.control.ScrollPane;
+
 import javafx.scene.control.TextField;
+
 import javafx.scene.layout.BorderPane;
+
 import javafx.scene.layout.HBox;
+
 import javafx.scene.layout.VBox;
+
 import javafx.stage.Stage;
 
 import java.util.ArrayList;
+
 import java.util.HashMap;
+
 import java.util.List;
+
 import java.util.Map;
+
 import java.util.Timer;
+
 import java.util.TimerTask;
 
 public class ChatClienteApp
@@ -61,39 +82,94 @@ public class ChatClienteApp
             String mensagem
     ) {
 
+        /*
+         * Novo formato:
+         *
+         * MESSAGE|id|remetente|conteudo
+         */
         if (mensagem.startsWith("MESSAGE|")) {
 
             String[] partes =
-                    mensagem.split("\\|", 3);
+                    mensagem.split("\\|", 4);
 
-            if (partes.length < 3) {
+            if (partes.length < 4) {
+                return;
+            }
+
+            int id;
+
+            try {
+
+                id =
+                        Integer.parseInt(
+                                partes[1]
+                        );
+
+            } catch (NumberFormatException e) {
+
+                System.out.println(
+                        "ID de mensagem inválido."
+                );
+
                 return;
             }
 
             String remetente =
-                    partes[1];
+                    partes[2];
 
             String conteudo =
-                    partes[2];
+                    partes[3];
+
+            String meuNome =
+                    sessao
+                            .getUsuarioLogado()
+                            .getNome();
+
+            boolean enviadaPorMim =
+                    remetente.equalsIgnoreCase(
+                            meuNome
+                    );
+
+            String contatoMensagem;
+
+            if (enviadaPorMim) {
+
+                contatoMensagem =
+                        contatoAtual;
+
+            } else {
+
+                contatoMensagem =
+                        remetente;
+            }
+
+            if (contatoMensagem == null) {
+                return;
+            }
 
             Mensagem novaMensagem =
                     new Mensagem(
+                            id,
                             remetente,
                             conteudo,
-                            false
+                            enviadaPorMim
                     );
 
             historicoConversas
                     .computeIfAbsent(
-                            remetente,
+                            contatoMensagem,
                             chave ->
                                     new ArrayList<>()
                     )
-                    .add(novaMensagem);
+                    .add(
+                            novaMensagem
+                    );
 
             Platform.runLater(() -> {
 
-                if (remetente.equals(contatoAtual)) {
+                if (contatoMensagem.equalsIgnoreCase(
+                        contatoAtual
+                )) {
 
                     adicionarMensagemNaTela(
                             novaMensagem
@@ -101,29 +177,56 @@ public class ChatClienteApp
                 }
             });
 
+            System.out.println(
+                    "Mensagem recebida: "
+                            + "ID=" + id
+                            + " | "
+                            + remetente
+                            + " -> "
+                            + conteudo
+            );
+
             return;
         }
 
         if (mensagem.startsWith("HISTORY_MESSAGE|")) {
 
             String[] partes =
-                    mensagem.split("\\|", 5);
+                    mensagem.split("\\|", 6);
 
-            if (partes.length < 5) {
+            if (partes.length < 6) {
+                return;
+            }
+
+            int id;
+
+            try {
+
+                id =
+                        Integer.parseInt(
+                                partes[1]
+                        );
+
+            } catch (NumberFormatException e) {
+
+                System.out.println(
+                        "ID de mensagem do histórico inválido."
+                );
+
                 return;
             }
 
             String remetente =
-                    partes[1];
-
-            String destinatario =
                     partes[2];
 
-            String conteudo =
+            String destinatario =
                     partes[3];
 
-            String dataHora =
+            String conteudo =
                     partes[4];
+
+            String dataHora =
+                    partes[5];
 
             String meuNome =
                     sessao
@@ -152,6 +255,7 @@ public class ChatClienteApp
 
             Mensagem mensagemHistorico =
                     new Mensagem(
+                            id,
                             remetente,
                             conteudo,
                             enviadaPorMim
@@ -182,6 +286,8 @@ public class ChatClienteApp
 
             System.out.println(
                     "Histórico recebido: "
+                            + "ID=" + id
+                            + " | "
                             + dataHora
                             + " | "
                             + remetente
@@ -198,6 +304,87 @@ public class ChatClienteApp
 
             System.out.println(
                     "Fim do histórico."
+            );
+
+            return;
+        }
+
+        /*
+         * Confirmação de que o servidor
+         * processou a exclusão da mensagem.
+         */
+        if (mensagem.startsWith("DELETE_OK|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 2);
+
+            if (partes.length < 2) {
+                return;
+            }
+
+            int id;
+
+            try {
+
+                id =
+                        Integer.parseInt(
+                                partes[1]
+                        );
+
+            } catch (NumberFormatException e) {
+
+                System.out.println(
+                        "ID inválido na confirmação de exclusão."
+                );
+
+                return;
+            }
+
+            System.out.println(
+                    "Mensagem "
+                            + id
+                            + " apagada com sucesso."
+            );
+
+            /*
+             * Remove a mensagem da memória
+             * do cliente.
+             */
+            removerMensagemDaMemoria(
+                    id
+            );
+
+            /*
+             * Remove a mensagem da interface.
+             */
+            Platform.runLater(() -> {
+
+                removerMensagemDaTela(
+                        id
+                );
+            });
+
+            return;
+        }
+
+        /*
+         * Erro ao tentar apagar uma mensagem.
+         */
+        if (mensagem.startsWith("DELETE_ERROR|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 2);
+
+            if (partes.length < 2) {
+                return;
+            }
+
+            String erro =
+                    partes[1];
+
+            System.out.println(
+                    "Erro ao apagar mensagem: "
+                            + erro
             );
 
             return;
@@ -367,9 +554,6 @@ public class ChatClienteApp
                         "Selecione um contato"
                 );
 
-        /*
-         * Indicador de digitação.
-         */
         indicadorDigitacao =
                 new Label("");
 
@@ -401,10 +585,6 @@ public class ChatClienteApp
                 "Digite uma mensagem..."
         );
 
-        /*
-         * Detecta quando o usuário começa
-         * ou continua digitando.
-         */
         campoMensagem.setOnKeyTyped(event -> {
 
             if (contatoAtual == null) {
@@ -469,10 +649,6 @@ public class ChatClienteApp
                         contatoSelecionado
                 );
 
-                /*
-                 * Limpa o indicador ao trocar
-                 * de conversa.
-                 */
                 indicadorDigitacao.setText(
                         ""
                 );
@@ -496,11 +672,6 @@ public class ChatClienteApp
                 200
         );
 
-        /*
-         * Cabeçalho da conversa.
-         * Contém o nome do contato e o
-         * indicador de digitação.
-         */
         VBox cabecalhoConversa =
                 new VBox(
                         3,
@@ -722,30 +893,14 @@ public class ChatClienteApp
                 contatoAtual
         );
 
+        /*
+         * A mensagem será adicionada à tela
+         * somente quando o servidor devolver
+         * o ID real.
+         */
         clienteTCP.enviarMensagem(
                 contatoAtual,
                 texto
-        );
-
-        Mensagem mensagem =
-                new Mensagem(
-                        sessao
-                                .getUsuarioLogado()
-                                .getNome(),
-                        texto,
-                        true
-                );
-
-        historicoConversas
-                .computeIfAbsent(
-                        contatoAtual,
-                        chave ->
-                                new ArrayList<>()
-                )
-                .add(mensagem);
-
-        adicionarMensagemNaTela(
-                mensagem
         );
 
         campoMensagem.clear();
@@ -783,6 +938,8 @@ public class ChatClienteApp
                         remetente,
                         conteudo
                 );
+
+        
 
         balaoMensagem.setPadding(
                 new Insets(10)
@@ -829,9 +986,153 @@ public class ChatClienteApp
             );
         }
 
+        /*
+         * Menu exibido ao clicar com o
+         * botão direito na mensagem.
+         */
+        ContextMenu menuMensagem =
+                new ContextMenu();
+
+        MenuItem apagarParaMim =
+                new MenuItem(
+                        "Apagar para mim"
+                );
+
+        apagarParaMim.setOnAction(event -> {
+
+            apagarMensagemParaMim(
+                    mensagem
+            );
+        });
+
+        menuMensagem
+                .getItems()
+                .add(
+                        apagarParaMim
+                );
+
+        balaoMensagem.setOnContextMenuRequested(
+                event -> {
+
+                    menuMensagem.show(
+                            balaoMensagem,
+                            event.getScreenX(),
+                            event.getScreenY()
+                    );
+                }
+        );
+
         mensagens.getChildren().add(
                 linhaMensagem
         );
+    }
+
+    /*
+     * Solicita ao servidor a exclusão lógica
+     * da mensagem para o usuário atual.
+     */
+    private void apagarMensagemParaMim(
+            Mensagem mensagem
+    ) {
+
+        int id =
+                mensagem.getId();
+
+        if (id <= 0) {
+
+            System.out.println(
+                    "Não é possível apagar uma mensagem sem ID."
+            );
+
+            return;
+        }
+
+        System.out.println(
+                "Solicitando exclusão da mensagem ID="
+                        + id
+        );
+
+        clienteTCP.apagarMensagem(
+                id
+        );
+    }
+
+    /*
+     * Remove uma mensagem da memória local.
+     */
+    private void removerMensagemDaMemoria(
+            int id
+    ) {
+
+        for (
+                List<Mensagem> mensagensConversa :
+                historicoConversas.values()
+        ) {
+
+            mensagensConversa.removeIf(
+                    mensagem ->
+                            mensagem.getId() == id
+            );
+        }
+    }
+
+    /*
+     * Remove a mensagem correspondente ao ID
+     * da interface gráfica.
+     */
+    private void removerMensagemDaTela(
+            int id
+    ) {
+
+        if (mensagens == null) {
+            return;
+        }
+
+        for (int i = 0;
+             i < mensagens.getChildren().size();
+             i++) {
+
+            javafx.scene.Node node =
+                    mensagens
+                            .getChildren()
+                            .get(i);
+
+            if (!(node instanceof HBox)) {
+                continue;
+            }
+
+            HBox linha =
+                    (HBox) node;
+
+            if (linha.getChildren().isEmpty()) {
+                continue;
+            }
+
+            javafx.scene.Node balao =
+                    linha
+                            .getChildren()
+                            .get(0);
+
+            if (!(balao instanceof VBox)) {
+                continue;
+            }
+
+            VBox balaoMensagem =
+                    (VBox) balao;
+
+            Object idMensagem =
+                    balaoMensagem.getUserData();
+
+            if (idMensagem instanceof Integer
+                    && (Integer) idMensagem == id) {
+
+                mensagens
+                        .getChildren()
+                        .remove(i);
+
+                break;
+            }
+        }
     }
 
     private void carregarHistorico() {
@@ -844,19 +1145,10 @@ public class ChatClienteApp
             return;
         }
 
-        /*
-         * Remove o histórico que estava
-         * temporariamente na memória para
-         * reconstruí-lo a partir do banco.
-         */
         historicoConversas.remove(
                 contatoAtual
         );
 
-        /*
-         * Solicita ao servidor todas as
-         * mensagens dessa conversa.
-         */
         clienteTCP.solicitarHistorico(
                 contatoAtual
         );

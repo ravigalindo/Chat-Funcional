@@ -9,14 +9,18 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 
 public class ClienteHandler implements Runnable {
 
     private final Socket cliente;
+
     private final GerenciadorClientes gerenciador;
+
     private final GerenciadorUsuariosBanco gerenciadorUsuariosBanco;
 
     private String nomeUsuario;
+
     private PrintWriter saida;
 
     public ClienteHandler(
@@ -24,8 +28,11 @@ public class ClienteHandler implements Runnable {
             GerenciadorClientes gerenciador,
             GerenciadorUsuariosBanco gerenciadorUsuariosBanco
     ) {
+
         this.cliente = cliente;
+
         this.gerenciador = gerenciador;
+
         this.gerenciadorUsuariosBanco =
                 gerenciadorUsuariosBanco;
     }
@@ -130,6 +137,12 @@ public class ClienteHandler implements Runnable {
             case "HISTORY":
 
                 processarHistorico(partes);
+
+                break;
+
+            case "DELETE_MESSAGE":
+
+                processarExclusaoMensagem(partes);
 
                 break;
 
@@ -341,14 +354,18 @@ public class ClienteHandler implements Runnable {
             return;
         }
 
-        boolean salva =
+        /*
+         * Salva a mensagem no banco e recupera
+         * o ID gerado pelo SQLite.
+         */
+        int idMensagem =
                 salvarMensagem(
                         nomeUsuario,
                         destinatario,
                         conteudo
                 );
 
-        if (!salva) {
+        if (idMensagem <= 0) {
 
             saida.println(
                     "ERRO|Não foi possível salvar a mensagem"
@@ -357,6 +374,23 @@ public class ClienteHandler implements Runnable {
             return;
         }
 
+        /*
+         * Novo formato das mensagens em tempo real:
+         *
+         * MESSAGE|id|remetente|conteudo
+         */
+        String mensagemTempoReal =
+                "MESSAGE|"
+                        + idMensagem
+                        + "|"
+                        + nomeUsuario
+                        + "|"
+                        + conteudo;
+
+        /*
+         * Envia a mensagem para o destinatário,
+         * caso ele esteja online.
+         */
         ClienteHandler clienteDestino =
                 gerenciador.encontrarCliente(
                         destinatario
@@ -365,19 +399,26 @@ public class ClienteHandler implements Runnable {
         if (clienteDestino != null) {
 
             clienteDestino.enviarMensagem(
-                    "MESSAGE|"
-                            + nomeUsuario
-                            + "|"
-                            + conteudo
+                    mensagemTempoReal
             );
         }
 
+        /*
+         * Envia também para o próprio remetente.
+         *
+         * Isso permite que o cliente receba
+         * o ID real gerado pelo banco.
+         */
         saida.println(
-                "MESSAGE_SENT"
+                mensagemTempoReal
         );
     }
 
-    private boolean salvarMensagem(
+    /*
+     * Salva a mensagem no banco e retorna
+     * o ID gerado pelo SQLite.
+     */
+    private int salvarMensagem(
             String remetente,
             String destinatario,
             String conteudo
@@ -395,7 +436,10 @@ public class ClienteHandler implements Runnable {
                         ConexaoSQLite.conectar();
 
                 PreparedStatement statement =
-                        conexao.prepareStatement(sql)
+                        conexao.prepareStatement(
+                                sql,
+                                Statement.RETURN_GENERATED_KEYS
+                        )
         ) {
 
             statement.setString(
@@ -415,14 +459,34 @@ public class ClienteHandler implements Runnable {
 
             statement.executeUpdate();
 
+            try (
+                    ResultSet resultado =
+                            statement.getGeneratedKeys()
+            ) {
+
+                if (resultado.next()) {
+
+                    int id =
+                            resultado.getInt(1);
+
+                    System.out.println(
+                            "Mensagem salva no banco: "
+                                    + remetente
+                                    + " -> "
+                                    + destinatario
+                                    + " | ID="
+                                    + id
+                    );
+
+                    return id;
+                }
+            }
+
             System.out.println(
-                    "Mensagem salva no banco: "
-                            + remetente
-                            + " -> "
-                            + destinatario
+                    "Mensagem salva, mas o ID não foi recuperado."
             );
 
-            return true;
+            return -1;
 
         } catch (SQLException e) {
 
@@ -432,7 +496,7 @@ public class ClienteHandler implements Runnable {
 
             e.printStackTrace();
 
-            return false;
+            return -1;
         }
     }
 
@@ -473,15 +537,24 @@ public class ClienteHandler implements Runnable {
         String sql =
                 """
                 SELECT
+                    id,
                     remetente,
                     destinatario,
                     conteudo,
                     data_hora
                 FROM mensagens
                 WHERE
-                    (remetente = ? AND destinatario = ?)
+                    (
+                        remetente = ?
+                        AND destinatario = ?
+                        AND apagada_remetente = 0
+                    )
                     OR
-                    (remetente = ? AND destinatario = ?)
+                    (
+                        remetente = ?
+                        AND destinatario = ?
+                        AND apagada_destinatario = 0
+                    )
                 ORDER BY data_hora ASC, id ASC
                 """;
 
@@ -522,6 +595,11 @@ public class ClienteHandler implements Runnable {
                         resultado.next()
                 ) {
 
+                    int id =
+                            resultado.getInt(
+                                    "id"
+                            );
+
                     String remetente =
                             resultado.getString(
                                     "remetente"
@@ -544,6 +622,8 @@ public class ClienteHandler implements Runnable {
 
                     saida.println(
                             "HISTORY_MESSAGE|"
+                                    + id
+                                    + "|"
                                     + remetente
                                     + "|"
                                     + destinatario
@@ -576,6 +656,157 @@ public class ClienteHandler implements Runnable {
 
             saida.println(
                     "ERRO|Não foi possível carregar o histórico"
+            );
+        }
+    }
+
+    private void processarExclusaoMensagem(
+            String[] partes
+    ) {
+
+        if (partes.length < 2) {
+
+            saida.println(
+                    "DELETE_ERROR|ID inválido"
+            );
+
+            return;
+        }
+
+        if (nomeUsuario == null) {
+
+            saida.println(
+                    "DELETE_ERROR|Usuário não autenticado"
+            );
+
+            return;
+        }
+
+        int id;
+
+        try {
+
+            id =
+                    Integer.parseInt(
+                            partes[1].trim()
+                    );
+
+        } catch (NumberFormatException e) {
+
+            saida.println(
+                    "DELETE_ERROR|ID inválido"
+            );
+
+            return;
+        }
+
+        if (id <= 0) {
+
+            saida.println(
+                    "DELETE_ERROR|ID inválido"
+            );
+
+            return;
+        }
+
+        String sql =
+                """
+                UPDATE mensagens
+                SET
+                    apagada_remetente =
+                        CASE
+                            WHEN remetente = ?
+                            THEN 1
+                            ELSE apagada_remetente
+                        END,
+                    apagada_destinatario =
+                        CASE
+                            WHEN destinatario = ?
+                            THEN 1
+                            ELSE apagada_destinatario
+                        END
+                WHERE
+                    id = ?
+                    AND (
+                        remetente = ?
+                        OR destinatario = ?
+                    )
+                """;
+
+        try (
+                Connection conexao =
+                        ConexaoSQLite.conectar();
+
+                PreparedStatement statement =
+                        conexao.prepareStatement(sql)
+        ) {
+
+            statement.setString(
+                    1,
+                    nomeUsuario
+            );
+
+            statement.setString(
+                    2,
+                    nomeUsuario
+            );
+
+            statement.setInt(
+                    3,
+                    id
+            );
+
+            statement.setString(
+                    4,
+                    nomeUsuario
+            );
+
+            statement.setString(
+                    5,
+                    nomeUsuario
+            );
+
+            int linhasAlteradas =
+                    statement.executeUpdate();
+
+            if (linhasAlteradas > 0) {
+
+                System.out.println(
+                        "Mensagem "
+                                + id
+                                + " apagada para: "
+                                + nomeUsuario
+                );
+
+                saida.println(
+                        "DELETE_OK|"
+                                + id
+                );
+
+            } else {
+
+                System.out.println(
+                        "Tentativa de apagar mensagem "
+                                + id
+                                + " sem permissão: "
+                                + nomeUsuario
+                );
+
+                saida.println(
+                        "DELETE_ERROR|Mensagem não encontrada ou sem permissão"
+                );
+            }
+
+        } catch (SQLException e) {
+
+            System.out.println(
+                    "Erro ao apagar mensagem:"
+            );
+
+            e.printStackTrace();
+
+            saida.println(
+                    "DELETE_ERROR|Não foi possível apagar a mensagem"
             );
         }
     }

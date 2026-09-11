@@ -200,6 +200,25 @@ public class ClienteTCP {
         );
     }
 
+    /*
+     * Solicita ao servidor que apague
+     * uma mensagem somente para o
+     * usuário logado.
+     */
+    public void apagarMensagem(
+            int id
+    ) {
+
+        if (saida == null) {
+            return;
+        }
+
+        saida.println(
+                "DELETE_MESSAGE|"
+                        + id
+        );
+    }
+
     public void enviarDigitacao(
             String destinatario
     ) {
