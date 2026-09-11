@@ -2,18 +2,38 @@ package ChatCliente;
 
 public class Mensagem {
 
-    private final String remetente;
-    private final String conteudo;
-    private final boolean enviadaPorMim;
+    private int id;
+    private String remetente;
+    private String conteudo;
+    private boolean enviadaPorMim;
 
     public Mensagem(
             String remetente,
             String conteudo,
             boolean enviadaPorMim
     ) {
+        this(
+                0,
+                remetente,
+                conteudo,
+                enviadaPorMim
+        );
+    }
+
+    public Mensagem(
+            int id,
+            String remetente,
+            String conteudo,
+            boolean enviadaPorMim
+    ) {
+        this.id = id;
         this.remetente = remetente;
         this.conteudo = conteudo;
         this.enviadaPorMim = enviadaPorMim;
+    }
+
+    public int getId() {
+        return id;
     }
 
     public String getRemetente() {
