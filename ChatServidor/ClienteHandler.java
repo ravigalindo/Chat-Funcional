@@ -10,6 +10,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 
 public class ClienteHandler implements Runnable {
 
@@ -117,49 +118,34 @@ public class ClienteHandler implements Runnable {
         switch (comando) {
 
             case "REGISTER":
-
                 processarCadastro(partes);
-
                 break;
 
             case "LOGIN":
-
                 processarLogin(partes);
-
                 break;
 
             case "MESSAGE":
-
                 processarMensagemChat(partes);
-
                 break;
 
             case "HISTORY":
-
                 processarHistorico(partes);
-
                 break;
 
             case "DELETE_MESSAGE":
-
                 processarExclusaoMensagem(partes);
-
                 break;
 
             case "TYPING":
-
                 processarDigitacao(partes);
-
                 break;
 
             case "STOP_TYPING":
-
                 processarParadaDigitacao(partes);
-
                 break;
 
             default:
-
                 saida.println(
                         "ERRO|Comando desconhecido"
                 );
@@ -185,8 +171,10 @@ public class ClienteHandler implements Runnable {
         String senha =
                 partes[2];
 
-        if (nome.isEmpty()
-                || senha.isEmpty()) {
+        if (
+                nome.isEmpty()
+                        || senha.isEmpty()
+        ) {
 
             saida.println(
                     "REGISTER_ERROR|Usuário ou senha inválidos"
@@ -196,11 +184,10 @@ public class ClienteHandler implements Runnable {
         }
 
         boolean cadastrado =
-                gerenciadorUsuariosBanco
-                        .cadastrarUsuario(
-                                nome,
-                                senha
-                        );
+                gerenciadorUsuariosBanco.cadastrarUsuario(
+                        nome,
+                        senha
+                );
 
         if (cadastrado) {
 
@@ -241,11 +228,10 @@ public class ClienteHandler implements Runnable {
                 partes[2];
 
         boolean autenticado =
-                gerenciadorUsuariosBanco
-                        .autenticar(
-                                nome,
-                                senha
-                        );
+                gerenciadorUsuariosBanco.autenticar(
+                        nome,
+                        senha
+                );
 
         if (!autenticado) {
 
@@ -262,9 +248,7 @@ public class ClienteHandler implements Runnable {
         }
 
         ClienteHandler usuarioConectado =
-                gerenciador.encontrarCliente(
-                        nome
-                );
+                gerenciador.encontrarCliente(nome);
 
         if (usuarioConectado != null) {
 
@@ -292,18 +276,194 @@ public class ClienteHandler implements Runnable {
                         + nomeUsuario
         );
 
-        String usuariosOnline =
-                gerenciador.obterUsuariosOnline();
+        /*
+         * Envia todos os usuários cadastrados
+         * no banco de dados.
+         */
+        List<String> usuariosCadastrados =
+                gerenciadorUsuariosBanco
+                        .listarUsuarios();
+
+        String listaUsuarios =
+                String.join(
+                        ",",
+                        usuariosCadastrados
+                );
 
         gerenciador.enviarParaTodos(
                 "USERS|"
+                        + listaUsuarios
+        );
+
+        /*
+         * Envia para o cliente que acabou de
+         * entrar a lista de usuários que já
+         * estavam online.
+         *
+         * Isso permite que o cliente saiba
+         * corretamente quem está online mesmo
+         * antes de receber novos eventos ONLINE.
+         */
+        String usuariosOnline =
+                gerenciador.obterUsuariosOnline();
+
+        saida.println(
+                "ONLINE_USERS|"
                         + usuariosOnline
         );
 
+        /*
+         * Continua avisando todos os clientes
+         * que este usuário acabou de ficar online.
+         */
         gerenciador.enviarParaTodos(
                 "ONLINE|"
                         + nomeUsuario
         );
+
+        /*
+         * Depois que o login foi concluído,
+         * procura mensagens que chegaram
+         * enquanto este usuário estava offline.
+         */
+        entregarMensagensPendentes();
+    }
+
+    private void entregarMensagensPendentes() {
+
+        if (nomeUsuario == null) {
+            return;
+        }
+
+        String sql =
+                """
+                SELECT
+                    id,
+                    remetente,
+                    conteudo
+                FROM mensagens
+                WHERE
+                    destinatario = ?
+                    AND entregue = 0
+                    AND apagada_destinatario = 0
+                ORDER BY data_hora ASC, id ASC
+                """;
+
+        try (
+                Connection conexao =
+                        ConexaoSQLite.conectar();
+
+                PreparedStatement statement =
+                        conexao.prepareStatement(sql)
+        ) {
+
+            statement.setString(
+                    1,
+                    nomeUsuario
+            );
+
+            try (
+                    ResultSet resultado =
+                            statement.executeQuery()
+            ) {
+
+                while (resultado.next()) {
+
+                    int id =
+                            resultado.getInt(
+                                    "id"
+                            );
+
+                    String remetente =
+                            resultado.getString(
+                                    "remetente"
+                            );
+
+                    String conteudo =
+                            resultado.getString(
+                                    "conteudo"
+                            );
+
+                    String mensagem =
+                            "MESSAGE|"
+                                    + id
+                                    + "|"
+                                    + remetente
+                                    + "|"
+                                    + conteudo;
+
+                    saida.println(
+                            mensagem
+                    );
+
+                    marcarMensagemComoEntregue(
+                            id
+                    );
+
+                    System.out.println(
+                            "Mensagem offline entregue: "
+                                    + "ID="
+                                    + id
+                                    + " | "
+                                    + remetente
+                                    + " -> "
+                                    + nomeUsuario
+                    );
+                }
+            }
+
+        } catch (SQLException e) {
+
+            System.out.println(
+                    "Erro ao entregar mensagens pendentes:"
+            );
+
+            e.printStackTrace();
+        }
+    }
+
+    private void marcarMensagemComoEntregue(
+            int id
+    ) {
+
+        String sql =
+                """
+                UPDATE mensagens
+                SET entregue = 1
+                WHERE
+                    id = ?
+                    AND destinatario = ?
+                    AND entregue = 0
+                """;
+
+        try (
+                Connection conexao =
+                        ConexaoSQLite.conectar();
+
+                PreparedStatement statement =
+                        conexao.prepareStatement(sql)
+        ) {
+
+            statement.setInt(
+                    1,
+                    id
+            );
+
+            statement.setString(
+                    2,
+                    nomeUsuario
+            );
+
+            statement.executeUpdate();
+
+        } catch (SQLException e) {
+
+            System.out.println(
+                    "Erro ao marcar mensagem como entregue:"
+            );
+
+            e.printStackTrace();
+        }
     }
 
     private void processarMensagemChat(
@@ -334,8 +494,10 @@ public class ClienteHandler implements Runnable {
             return;
         }
 
-        if (destinatario == null
-                || destinatario.trim().isEmpty()) {
+        if (
+                destinatario == null
+                        || destinatario.trim().isEmpty()
+        ) {
 
             saida.println(
                     "ERRO|Destinatário inválido"
@@ -344,8 +506,10 @@ public class ClienteHandler implements Runnable {
             return;
         }
 
-        if (conteudo == null
-                || conteudo.trim().isEmpty()) {
+        if (
+                conteudo == null
+                        || conteudo.trim().isEmpty()
+        ) {
 
             saida.println(
                     "ERRO|Mensagem vazia"
@@ -354,10 +518,6 @@ public class ClienteHandler implements Runnable {
             return;
         }
 
-        /*
-         * Salva a mensagem no banco e recupera
-         * o ID gerado pelo SQLite.
-         */
         int idMensagem =
                 salvarMensagem(
                         nomeUsuario,
@@ -374,11 +534,11 @@ public class ClienteHandler implements Runnable {
             return;
         }
 
-        /*
-         * Novo formato das mensagens em tempo real:
-         *
-         * MESSAGE|id|remetente|conteudo
-         */
+        ClienteHandler clienteDestino =
+                gerenciador.encontrarCliente(
+                        destinatario
+                );
+
         String mensagemTempoReal =
                 "MESSAGE|"
                         + idMensagem
@@ -387,37 +547,67 @@ public class ClienteHandler implements Runnable {
                         + "|"
                         + conteudo;
 
-        /*
-         * Envia a mensagem para o destinatário,
-         * caso ele esteja online.
-         */
-        ClienteHandler clienteDestino =
-                gerenciador.encontrarCliente(
-                        destinatario
-                );
-
         if (clienteDestino != null) {
 
             clienteDestino.enviarMensagem(
                     mensagemTempoReal
             );
+
+            marcarMensagemComoEntreguePara(
+                    idMensagem,
+                    destinatario
+            );
         }
 
-        /*
-         * Envia também para o próprio remetente.
-         *
-         * Isso permite que o cliente receba
-         * o ID real gerado pelo banco.
-         */
         saida.println(
                 mensagemTempoReal
         );
     }
 
-    /*
-     * Salva a mensagem no banco e retorna
-     * o ID gerado pelo SQLite.
-     */
+    private void marcarMensagemComoEntreguePara(
+            int id,
+            String destinatario
+    ) {
+
+        String sql =
+                """
+                UPDATE mensagens
+                SET entregue = 1
+                WHERE
+                    id = ?
+                    AND destinatario = ?
+                """;
+
+        try (
+                Connection conexao =
+                        ConexaoSQLite.conectar();
+
+                PreparedStatement statement =
+                        conexao.prepareStatement(sql)
+        ) {
+
+            statement.setInt(
+                    1,
+                    id
+            );
+
+            statement.setString(
+                    2,
+                    destinatario
+            );
+
+            statement.executeUpdate();
+
+        } catch (SQLException e) {
+
+            System.out.println(
+                    "Erro ao atualizar entrega da mensagem:"
+            );
+
+            e.printStackTrace();
+        }
+    }
+
     private int salvarMensagem(
             String remetente,
             String destinatario,
@@ -591,14 +781,10 @@ public class ClienteHandler implements Runnable {
                             statement.executeQuery()
             ) {
 
-                while (
-                        resultado.next()
-                ) {
+                while (resultado.next()) {
 
                     int id =
-                            resultado.getInt(
-                                    "id"
-                            );
+                            resultado.getInt("id");
 
                     String remetente =
                             resultado.getString(
@@ -868,15 +1054,11 @@ public class ClienteHandler implements Runnable {
     ) {
 
         if (saida != null) {
-
-            saida.println(
-                    mensagem
-            );
+            saida.println(mensagem);
         }
     }
 
     public String getNomeUsuario() {
-
         return nomeUsuario;
     }
 }

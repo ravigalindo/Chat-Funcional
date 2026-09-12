@@ -34,9 +34,13 @@ import java.util.ArrayList;
 
 import java.util.HashMap;
 
+import java.util.HashSet;
+
 import java.util.List;
 
 import java.util.Map;
+
+import java.util.Set;
 
 import java.util.Timer;
 
@@ -53,6 +57,20 @@ public class ChatClienteApp
 
     private final Map<String, List<Mensagem>> historicoConversas =
             new HashMap<>();
+
+    /*
+     * Guarda os usuários que estão cadastrados
+     * no sistema.
+     */
+    private final List<String> usuariosCadastrados =
+            new ArrayList<>();
+
+    /*
+     * Guarda os usuários que estão online
+     * neste momento.
+     */
+    private final Set<String> usuariosOnline =
+            new HashSet<>();
 
     private VBox mensagens;
 
@@ -390,6 +408,10 @@ public class ChatClienteApp
             return;
         }
 
+        /*
+         * Recebe todos os usuários cadastrados
+         * no banco.
+         */
         if (mensagem.startsWith("USERS|")) {
 
             String[] partes =
@@ -404,8 +426,99 @@ public class ChatClienteApp
 
             Platform.runLater(() -> {
 
-                atualizarListaContatos(
+                atualizarListaUsuarios(
                         usuarios
+                );
+            });
+
+            return;
+        }
+
+        /*
+         * Recebe a lista de usuários que já
+         * estavam online quando este cliente
+         * entrou.
+         */
+        if (mensagem.startsWith("ONLINE_USERS|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 2);
+
+            if (partes.length < 2) {
+                return;
+            }
+
+            String usuarios =
+                    partes[1];
+
+            Platform.runLater(() -> {
+
+                atualizarUsuariosOnline(
+                        usuarios
+                );
+
+                atualizarListaContatosVisual();
+            });
+
+            return;
+        }
+
+        /*
+         * Recebe o aviso de que um usuário
+         * acabou de ficar online.
+         */
+        if (mensagem.startsWith("ONLINE|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 2);
+
+            if (partes.length < 2) {
+                return;
+            }
+
+            String nomeUsuario =
+                    partes[1].trim();
+
+            Platform.runLater(() -> {
+
+                adicionarUsuarioOnline(
+                        nomeUsuario
+                );
+
+                atualizarStatusContato(
+                        nomeUsuario,
+                        true
+                );
+            });
+
+            return;
+        }
+
+        /*
+         * Recebe o aviso de que um usuário
+         * ficou offline.
+         */
+        if (mensagem.startsWith("OFFLINE|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 2);
+
+            if (partes.length < 2) {
+                return;
+            }
+
+            String nomeUsuario =
+                    partes[1].trim();
+
+            Platform.runLater(() -> {
+
+                removerUsuarioOnline(
+                        nomeUsuario
+                );
+
+                atualizarStatusContato(
+                        nomeUsuario,
+                        false
                 );
             });
 
@@ -485,50 +598,6 @@ public class ChatClienteApp
             });
 
             return;
-        }
-
-        if (mensagem.startsWith("ONLINE|")) {
-
-            String[] partes =
-                    mensagem.split("\\|", 2);
-
-            if (partes.length < 2) {
-                return;
-            }
-
-            String nomeUsuario =
-                    partes[1];
-
-            Platform.runLater(() -> {
-
-                atualizarStatusContato(
-                        nomeUsuario,
-                        true
-                );
-            });
-
-            return;
-        }
-
-        if (mensagem.startsWith("OFFLINE|")) {
-
-            String[] partes =
-                    mensagem.split("\\|", 2);
-
-            if (partes.length < 2) {
-                return;
-            }
-
-            String nomeUsuario =
-                    partes[1];
-
-            Platform.runLater(() -> {
-
-                atualizarStatusContato(
-                        nomeUsuario,
-                        false
-                );
-            });
         }
     }
 
@@ -740,29 +809,69 @@ public class ChatClienteApp
         );
 
         stage.setScene(scene);
+
         stage.show();
+
+        /*
+         * Caso a lista de usuários tenha sido
+         * recebida antes da interface terminar
+         * de ser criada, atualizamos a tela agora.
+         */
+        atualizarListaContatosVisual();
     }
 
-    private void atualizarListaContatos(
+    /*
+     * Atualiza a lista de usuários cadastrados.
+     */
+    private void atualizarListaUsuarios(
             String usuarios
     ) {
 
-        if (listaContatos == null) {
-            return;
+        usuariosCadastrados.clear();
+
+        if (!usuarios.isEmpty()) {
+
+            String[] listaUsuarios =
+                    usuarios.split(",");
+
+            for (String nomeUsuario :
+                    listaUsuarios) {
+
+                nomeUsuario =
+                        nomeUsuario.trim();
+
+                if (nomeUsuario.isEmpty()) {
+                    continue;
+                }
+
+                if (!contemUsuario(
+                        usuariosCadastrados,
+                        nomeUsuario
+                )) {
+
+                    usuariosCadastrados.add(
+                            nomeUsuario
+                    );
+                }
+            }
         }
 
-        listaContatos
-                .getItems()
-                .clear();
+        atualizarListaContatosVisual();
+    }
+
+    /*
+     * Atualiza o conjunto de usuários online
+     * recebido pelo servidor.
+     */
+    private void atualizarUsuariosOnline(
+            String usuarios
+    ) {
+
+        usuariosOnline.clear();
 
         if (usuarios.isEmpty()) {
             return;
         }
-
-        String meuNome =
-                sessao
-                        .getUsuarioLogado()
-                        .getNome();
 
         String[] listaUsuarios =
                 usuarios.split(",");
@@ -777,21 +886,110 @@ public class ChatClienteApp
                 continue;
             }
 
+            usuariosOnline.add(
+                    nomeUsuario
+            );
+        }
+    }
+
+    /*
+     * Adiciona um usuário ao conjunto
+     * de usuários online.
+     */
+    private void adicionarUsuarioOnline(
+            String nomeUsuario
+    ) {
+
+        if (nomeUsuario == null
+                || nomeUsuario.trim().isEmpty()) {
+
+            return;
+        }
+
+        usuariosOnline.add(
+                nomeUsuario.trim()
+        );
+    }
+
+    /*
+     * Remove um usuário do conjunto
+     * de usuários online.
+     */
+    private void removerUsuarioOnline(
+            String nomeUsuario
+    ) {
+
+        if (nomeUsuario == null) {
+            return;
+        }
+
+        usuariosOnline.removeIf(
+                usuario ->
+                        usuario.equalsIgnoreCase(
+                                nomeUsuario.trim()
+                        )
+        );
+    }
+
+    /*
+     * Monta visualmente a lista de contatos
+     * usando os usuários cadastrados e a
+     * informação de quem está online.
+     */
+    private void atualizarListaContatosVisual() {
+
+        if (listaContatos == null) {
+            return;
+        }
+
+        listaContatos
+                .getItems()
+                .clear();
+
+        String meuNome =
+                sessao
+                        .getUsuarioLogado()
+                        .getNome();
+
+        for (String nomeUsuario :
+                usuariosCadastrados) {
+
             if (nomeUsuario.equalsIgnoreCase(
                     meuNome
             )) {
+
                 continue;
+            }
+
+            boolean online =
+                    estaOnline(
+                            nomeUsuario
+                    );
+
+            String status;
+
+            if (online) {
+
+                status = "🟢 ";
+
+            } else {
+
+                status = "⚫ ";
             }
 
             listaContatos
                     .getItems()
                     .add(
-                            "🟢 "
+                            status
                                     + nomeUsuario
                     );
         }
     }
 
+    /*
+     * Atualiza somente o status visual
+     * de um contato.
+     */
     private void atualizarStatusContato(
             String nomeUsuario,
             boolean online
@@ -811,7 +1009,9 @@ public class ChatClienteApp
                             .get(i);
 
             String nome =
-                    removerStatus(contato);
+                    removerStatus(
+                            contato
+                    );
 
             if (nome.equalsIgnoreCase(
                     nomeUsuario
@@ -820,8 +1020,11 @@ public class ChatClienteApp
                 String novoStatus;
 
                 if (online) {
+
                     novoStatus = "🟢 ";
+
                 } else {
+
                     novoStatus = "⚫ ";
                 }
 
@@ -835,6 +1038,51 @@ public class ChatClienteApp
                 break;
             }
         }
+    }
+
+    /*
+     * Verifica se um usuário está online.
+     */
+    private boolean estaOnline(
+            String nomeUsuario
+    ) {
+
+        for (String usuario :
+                usuariosOnline) {
+
+            if (usuario.equalsIgnoreCase(
+                    nomeUsuario
+            )) {
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /*
+     * Verifica se uma lista já contém
+     * determinado usuário ignorando
+     * diferença entre maiúsculas e minúsculas.
+     */
+    private boolean contemUsuario(
+            List<String> lista,
+            String nomeUsuario
+    ) {
+
+        for (String usuario :
+                lista) {
+
+            if (usuario.equalsIgnoreCase(
+                    nomeUsuario
+            )) {
+
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void iniciarContadorParadaDigitacao() {
@@ -939,7 +1187,13 @@ public class ChatClienteApp
                         conteudo
                 );
 
-        
+        /*
+         * Guarda o ID real da mensagem
+         * no componente visual.
+         */
+        balaoMensagem.setUserData(
+                mensagem.getId()
+        );
 
         balaoMensagem.setPadding(
                 new Insets(10)
