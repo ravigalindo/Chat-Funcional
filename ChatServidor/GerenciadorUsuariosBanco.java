@@ -4,6 +4,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class GerenciadorUsuariosBanco {
 
@@ -127,42 +129,102 @@ public class GerenciadorUsuariosBanco {
         }
     }
 
+    /*
+     * Retorna todos os usuários cadastrados
+     * no banco de dados.
+     */
+    public List<String> listarUsuarios() {
+
+        List<String> usuarios =
+                new ArrayList<>();
+
+        String sql =
+                """
+                SELECT nome
+                FROM usuarios
+                ORDER BY nome ASC
+                """;
+
+        try (
+                Connection conexao =
+                        ConexaoSQLite.conectar();
+
+                PreparedStatement statement =
+                        conexao.prepareStatement(sql);
+
+                ResultSet resultado =
+                        statement.executeQuery()
+        ) {
+
+            while (resultado.next()) {
+
+                usuarios.add(
+                        resultado.getString("nome")
+                );
+            }
+
+        } catch (SQLException e) {
+
+            System.out.println(
+                    "Erro ao listar usuários:"
+            );
+
+            e.printStackTrace();
+        }
+
+        return usuarios;
+    }
+
     public static void main(String[] args) {
 
-    GerenciadorUsuariosBanco gerenciador =
-            new GerenciadorUsuariosBanco();
+        GerenciadorUsuariosBanco gerenciador =
+                new GerenciadorUsuariosBanco();
 
-    boolean cadastrado =
-            gerenciador.cadastrarUsuario(
-                    "teste",
-                    "123456"
+        boolean cadastrado =
+                gerenciador.cadastrarUsuario(
+                        "teste",
+                        "123456"
+                );
+
+        System.out.println(
+                "Cadastro realizado: "
+                        + cadastrado
+        );
+
+        boolean autenticado =
+                gerenciador.autenticar(
+                        "teste",
+                        "123456"
+                );
+
+        System.out.println(
+                "Autenticação correta: "
+                        + autenticado
+        );
+
+        boolean senhaErrada =
+                gerenciador.autenticar(
+                        "teste",
+                        "senhaerrada"
+                );
+
+        System.out.println(
+                "Autenticação com senha errada: "
+                        + senhaErrada
+        );
+
+        System.out.println(
+                "Usuários cadastrados:"
+        );
+
+        List<String> usuarios =
+                gerenciador.listarUsuarios();
+
+        for (String usuario : usuarios) {
+
+            System.out.println(
+                    "- " + usuario
             );
-
-    System.out.println(
-            "Cadastro realizado: "
-                    + cadastrado
-    );
-
-    boolean autenticado =
-            gerenciador.autenticar(
-                    "teste",
-                    "123456"
-            );
-
-    System.out.println(
-            "Autenticação correta: "
-                    + autenticado
-    );
-
-    boolean senhaErrada =
-            gerenciador.autenticar(
-                    "teste",
-                    "senhaerrada"
-            );
-
-    System.out.println(
-            "Autenticação com senha errada: "
-                    + senhaErrada
-    );
+        }
     }
 }
