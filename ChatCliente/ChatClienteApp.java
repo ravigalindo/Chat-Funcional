@@ -192,6 +192,19 @@ public class ChatClienteApp
                     adicionarMensagemNaTela(
                             novaMensagem
                     );
+
+                    /*
+                     * Se a mensagem foi recebida de
+                     * outro usuário e a conversa já
+                     * está aberta, marca a mensagem
+                     * automaticamente como lida.
+                     */
+                    if (!enviadaPorMim) {
+
+                        clienteTCP.marcarComoLidas(
+                                remetente
+                        );
+                    }
                 }
             });
 
@@ -203,6 +216,57 @@ public class ChatClienteApp
                             + " -> "
                             + conteudo
             );
+
+            return;
+        }
+
+        /*
+         * Recebe a confirmação de que uma
+         * mensagem enviada por mim foi lida
+         * pelo destinatário.
+         *
+         * Formato:
+         *
+         * READ|id
+         */
+        if (mensagem.startsWith("READ|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 2);
+
+            if (partes.length < 2) {
+                return;
+            }
+
+            int id;
+
+            try {
+
+                id =
+                        Integer.parseInt(
+                                partes[1]
+                        );
+
+            } catch (NumberFormatException e) {
+
+                System.out.println(
+                        "ID inválido no aviso de leitura."
+                );
+
+                return;
+            }
+
+            System.out.println(
+                    "Mensagem lida: ID="
+                            + id
+            );
+
+            Platform.runLater(() -> {
+
+                atualizarIndicadorMensagemLida(
+                        id
+                );
+            });
 
             return;
         }
@@ -723,6 +787,10 @@ public class ChatClienteApp
                 );
 
                 carregarHistorico();
+
+                clienteTCP.marcarComoLidas(
+                        contatoAtual
+                );
             }
         });
 
@@ -1180,11 +1248,53 @@ public class ChatClienteApp
                 350
         );
 
+        /*
+         * Área inferior do balão.
+         *
+         * Para mensagens enviadas por mim,
+         * será exibido o indicador "•".
+         */
+        HBox rodapeMensagem =
+                new HBox();
+
+        rodapeMensagem.setAlignment(
+                Pos.CENTER_RIGHT
+        );
+
+        if (mensagem.isEnviadaPorMim()) {
+
+            Label indicadorEntrega =
+                    new Label("•");
+
+            indicadorEntrega.setStyle(
+                    "-fx-font-size: 14px;"
+                            + "-fx-font-weight: bold;"
+                            + "-fx-text-fill: #555555;"
+            );
+
+            /*
+             * Guarda o indicador de entrega
+             * no balão para podermos alterá-lo
+             * posteriormente quando a mensagem
+             * for lida.
+             */
+            rodapeMensagem.setUserData(
+                    indicadorEntrega
+            );
+
+            rodapeMensagem
+                    .getChildren()
+                    .add(
+                            indicadorEntrega
+                    );
+        }
+
         VBox balaoMensagem =
                 new VBox(
                         3,
                         remetente,
-                        conteudo
+                        conteudo,
+                        rodapeMensagem
                 );
 
         /*
@@ -1279,6 +1389,101 @@ public class ChatClienteApp
         mensagens.getChildren().add(
                 linhaMensagem
         );
+    }
+
+    /*
+     * Atualiza o indicador visual de uma
+     * mensagem quando o servidor informa
+     * que ela foi lida.
+     */
+    private void atualizarIndicadorMensagemLida(
+            int id
+    ) {
+
+        if (mensagens == null) {
+            return;
+        }
+
+        for (javafx.scene.Node node :
+                mensagens.getChildren()) {
+
+            if (!(node instanceof HBox)) {
+                continue;
+            }
+
+            HBox linhaMensagem =
+                    (HBox) node;
+
+            if (linhaMensagem
+                    .getChildren()
+                    .isEmpty()) {
+
+                continue;
+            }
+
+            javafx.scene.Node balao =
+                    linhaMensagem
+                            .getChildren()
+                            .get(0);
+
+            if (!(balao instanceof VBox)) {
+                continue;
+            }
+
+            VBox balaoMensagem =
+                    (VBox) balao;
+
+            Object idMensagem =
+                    balaoMensagem.getUserData();
+
+            if (!(idMensagem instanceof Integer)) {
+                continue;
+            }
+
+            if ((Integer) idMensagem != id) {
+                continue;
+            }
+
+            if (balaoMensagem
+                    .getChildren()
+                    .size() < 3) {
+
+                return;
+            }
+
+            javafx.scene.Node rodape =
+                    balaoMensagem
+                            .getChildren()
+                            .get(2);
+
+            if (!(rodape instanceof HBox)) {
+                return;
+            }
+
+            HBox rodapeMensagem =
+                    (HBox) rodape;
+
+            Object indicador =
+                    rodapeMensagem.getUserData();
+
+            if (indicador instanceof Label) {
+
+                Label indicadorEntrega =
+                        (Label) indicador;
+
+                indicadorEntrega.setText(
+                        "••"
+                );
+
+                System.out.println(
+                        "Indicador da mensagem "
+                                + id
+                                + " atualizado para ••."
+                );
+            }
+
+            return;
+        }
     }
 
     /*

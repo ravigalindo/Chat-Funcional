@@ -47,7 +47,8 @@ public class ConexaoSQLite {
                     data_hora TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     apagada_remetente INTEGER NOT NULL DEFAULT 0,
                     apagada_destinatario INTEGER NOT NULL DEFAULT 0,
-                    entregue INTEGER NOT NULL DEFAULT 0
+                    entregue INTEGER NOT NULL DEFAULT 0,
+                    lida INTEGER NOT NULL DEFAULT 0
                 )
                 """;
 
@@ -64,12 +65,10 @@ public class ConexaoSQLite {
             statement.execute(sqlMensagens);
 
             /*
-             * O banco pode já existir de uma execução anterior.
+             * Verifica se a coluna entregue existe.
              *
-             * Nesse caso, a tabela mensagens já existe e o
-             * CREATE TABLE IF NOT EXISTS não altera sua estrutura.
-             *
-             * Por isso verificamos se a coluna entregue existe.
+             * Isso é necessário porque o banco pode ter sido
+             * criado antes da existência dessa coluna.
              */
             try (
                     var resultado =
@@ -79,6 +78,8 @@ public class ConexaoSQLite {
             ) {
 
                 boolean colunaEntregueExiste = false;
+
+                boolean colunaLidaExiste = false;
 
                 while (resultado.next()) {
 
@@ -90,8 +91,13 @@ public class ConexaoSQLite {
                     )) {
 
                         colunaEntregueExiste = true;
+                    }
 
-                        break;
+                    if ("lida".equalsIgnoreCase(
+                            nomeColuna
+                    )) {
+
+                        colunaLidaExiste = true;
                     }
                 }
 
@@ -107,6 +113,21 @@ public class ConexaoSQLite {
 
                     System.out.println(
                             "Coluna 'entregue' adicionada à tabela mensagens."
+                    );
+                }
+
+                if (!colunaLidaExiste) {
+
+                    statement.executeUpdate(
+                            """
+                            ALTER TABLE mensagens
+                            ADD COLUMN lida
+                            INTEGER NOT NULL DEFAULT 0
+                            """
+                    );
+
+                    System.out.println(
+                            "Coluna 'lida' adicionada à tabela mensagens."
                     );
                 }
             }

@@ -10,10 +10,13 @@ import java.util.function.Consumer;
 public class ClienteTCP {
 
     private static final String HOST = "localhost";
+
     private static final int PORTA = 5000;
 
     private Socket socket;
+
     private BufferedReader entrada;
+
     private PrintWriter saida;
 
     private Thread threadRecebimento;
@@ -197,6 +200,25 @@ public class ClienteTCP {
         saida.println(
                 "HISTORY|"
                         + usuario
+        );
+    }
+
+    /*
+     * Informa ao servidor que as mensagens
+     * recebidas de determinado usuário
+     * foram visualizadas.
+     */
+    public void marcarComoLidas(
+            String remetente
+    ) {
+
+        if (saida == null) {
+            return;
+        }
+
+        saida.println(
+                "READ|"
+                        + remetente
         );
     }
 

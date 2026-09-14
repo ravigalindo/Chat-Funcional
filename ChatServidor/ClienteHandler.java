@@ -137,6 +137,10 @@ public class ClienteHandler implements Runnable {
                 processarExclusaoMensagem(partes);
                 break;
 
+            case "READ":
+                processarLeitura(partes);
+                break;
+
             case "TYPING":
                 processarDigitacao(partes);
                 break;
@@ -994,6 +998,151 @@ public class ClienteHandler implements Runnable {
             saida.println(
                     "DELETE_ERROR|Não foi possível apagar a mensagem"
             );
+        }
+    }
+
+    private void processarLeitura(
+            String[] partes
+    ) {
+
+        if (partes.length < 2) {
+
+            return;
+        }
+
+        if (nomeUsuario == null) {
+
+            return;
+        }
+
+        String remetente =
+                partes[1].trim();
+
+        if (remetente.isEmpty()) {
+
+            return;
+        }
+
+        marcarMensagensComoLidas(
+                remetente
+        );
+    }
+
+    private void marcarMensagensComoLidas(
+            String remetente
+    ) {
+
+        String sqlSelecionar =
+                """
+                SELECT id
+                FROM mensagens
+                WHERE
+                    remetente = ?
+                    AND destinatario = ?
+                    AND lida = 0
+                    AND apagada_destinatario = 0
+                ORDER BY id ASC
+                """;
+
+        String sqlAtualizar =
+                """
+                UPDATE mensagens
+                SET lida = 1
+                WHERE
+                    id = ?
+                    AND remetente = ?
+                    AND destinatario = ?
+                    AND lida = 0
+                """;
+
+        try (
+                Connection conexao =
+                        ConexaoSQLite.conectar();
+
+                PreparedStatement selecionar =
+                        conexao.prepareStatement(
+                                sqlSelecionar
+                        );
+
+                PreparedStatement atualizar =
+                        conexao.prepareStatement(
+                                sqlAtualizar
+                        )
+        ) {
+
+            selecionar.setString(
+                    1,
+                    remetente
+            );
+
+            selecionar.setString(
+                    2,
+                    nomeUsuario
+            );
+
+            try (
+                    ResultSet resultado =
+                            selecionar.executeQuery()
+            ) {
+
+                while (resultado.next()) {
+
+                    int id =
+                            resultado.getInt("id");
+
+                    atualizar.setInt(
+                            1,
+                            id
+                    );
+
+                    atualizar.setString(
+                            2,
+                            remetente
+                    );
+
+                    atualizar.setString(
+                            3,
+                            nomeUsuario
+                    );
+
+                    int alteradas =
+                            atualizar.executeUpdate();
+
+                    if (alteradas > 0) {
+
+                        ClienteHandler clienteRemetente =
+                                gerenciador.encontrarCliente(
+                                        remetente
+                                );
+
+                        if (clienteRemetente != null) {
+
+                            clienteRemetente.enviarMensagem(
+                                    "READ|"
+                                            + id
+                            );
+                        }
+
+                        System.out.println(
+                                "Mensagem marcada como lida: "
+                                        + "ID="
+                                        + id
+                                        + " | "
+                                        + remetente
+                                        + " -> "
+                                        + nomeUsuario
+                        );
+                    }
+                }
+            }
+
+        } catch (SQLException e) {
+
+            System.out.println(
+                    "Erro ao marcar mensagens como lidas:"
+            );
+
+            e.printStackTrace();
         }
     }
 
