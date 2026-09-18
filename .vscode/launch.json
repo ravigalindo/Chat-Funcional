@@ -3,6 +3,34 @@
     "configurations": [
         {
             "type": "java",
+            "name": "TesteVerificacaoArgon2",
+            "request": "launch",
+            "mainClass": "ChatServidor.Segurança.TesteVerificacaoArgon2",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
+            "name": "TesteMigracaoArgon2",
+            "request": "launch",
+            "mainClass": "ChatServidor.Segurança.TesteMigracaoArgon2",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
+            "name": "TesteUsuariosBanco",
+            "request": "launch",
+            "mainClass": "ChatServidor.Segurança.TesteUsuariosBanco",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
+            "name": "TesteArgon2",
+            "request": "launch",
+            "mainClass": "ChatServidor.Segurança.TesteArgon2",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
             "name": "GerenciadorMensagensBanco",
             "request": "launch",
             "mainClass": "ChatServidor.GerenciadorMensagensBanco",
