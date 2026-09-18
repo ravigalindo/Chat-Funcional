@@ -33,7 +33,8 @@ public class ConexaoSQLite {
                 CREATE TABLE IF NOT EXISTS usuarios (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     nome TEXT NOT NULL UNIQUE,
-                    senha TEXT NOT NULL
+                    senha TEXT,
+                    senha_hash TEXT
                 )
                 """;
 
@@ -60,77 +61,22 @@ public class ConexaoSQLite {
                         conexao.createStatement()
         ) {
 
+            /*
+             * Cria as tabelas caso ainda não existam.
+             */
             statement.execute(sqlUsuarios);
-
             statement.execute(sqlMensagens);
 
             /*
-             * Verifica se a coluna entregue existe.
-             *
-             * Isso é necessário porque o banco pode ter sido
-             * criado antes da existência dessa coluna.
+             * Verifica a estrutura atual da tabela usuarios.
              */
-            try (
-                    var resultado =
-                            statement.executeQuery(
-                                    "PRAGMA table_info(mensagens)"
-                            )
-            ) {
+            migrarTabelaUsuarios(statement);
 
-                boolean colunaEntregueExiste = false;
-
-                boolean colunaLidaExiste = false;
-
-                while (resultado.next()) {
-
-                    String nomeColuna =
-                            resultado.getString("name");
-
-                    if ("entregue".equalsIgnoreCase(
-                            nomeColuna
-                    )) {
-
-                        colunaEntregueExiste = true;
-                    }
-
-                    if ("lida".equalsIgnoreCase(
-                            nomeColuna
-                    )) {
-
-                        colunaLidaExiste = true;
-                    }
-                }
-
-                if (!colunaEntregueExiste) {
-
-                    statement.executeUpdate(
-                            """
-                            ALTER TABLE mensagens
-                            ADD COLUMN entregue
-                            INTEGER NOT NULL DEFAULT 0
-                            """
-                    );
-
-                    System.out.println(
-                            "Coluna 'entregue' adicionada à tabela mensagens."
-                    );
-                }
-
-                if (!colunaLidaExiste) {
-
-                    statement.executeUpdate(
-                            """
-                            ALTER TABLE mensagens
-                            ADD COLUMN lida
-                            INTEGER NOT NULL DEFAULT 0
-                            """
-                    );
-
-                    System.out.println(
-                            "Coluna 'lida' adicionada à tabela mensagens."
-                    );
-                }
-            }
+            /*
+             * Verifica se as colunas entregue e lida
+             * existem na tabela mensagens.
+             */
+            migrarTabelaMensagens(statement);
 
             System.out.println(
                     "Tabelas criadas/verificadas com sucesso!"
@@ -143,6 +89,219 @@ public class ConexaoSQLite {
             );
 
             e.printStackTrace();
+        }
+    }
+
+    private static void migrarTabelaUsuarios(
+            Statement statement
+    ) throws SQLException {
+
+        boolean colunaSenhaExiste = false;
+        boolean colunaSenhaHashExiste = false;
+
+        try (
+                var resultado =
+                        statement.executeQuery(
+                                "PRAGMA table_info(usuarios)"
+                        )
+        ) {
+
+            while (resultado.next()) {
+
+                String nomeColuna =
+                        resultado.getString("name");
+
+                if ("senha".equalsIgnoreCase(
+                        nomeColuna
+                )) {
+
+                    colunaSenhaExiste = true;
+                }
+
+                if ("senha_hash".equalsIgnoreCase(
+                        nomeColuna
+                )) {
+
+                    colunaSenhaHashExiste = true;
+                }
+            }
+        }
+
+        /*
+         * Se senha_hash ainda não existir,
+         * adiciona a coluna.
+         */
+        if (!colunaSenhaHashExiste) {
+
+            statement.executeUpdate(
+                    """
+                    ALTER TABLE usuarios
+                    ADD COLUMN senha_hash TEXT
+                    """
+            );
+
+            System.out.println(
+                    "Coluna 'senha_hash' adicionada à tabela usuarios."
+            );
+        }
+
+        /*
+         * A tabela antiga possui:
+         *
+         * senha TEXT NOT NULL
+         *
+         * SQLite não permite simplesmente alterar
+         * essa coluna para aceitar NULL.
+         *
+         * Portanto, fazemos uma migração completa
+         * somente se a coluna senha ainda estiver
+         * configurada como NOT NULL.
+         */
+        if (colunaSenhaExiste && colunaSenhaEhObrigatoria(statement)) {
+
+            System.out.println(
+                    "Migrando estrutura da tabela usuarios..."
+            );
+
+            statement.executeUpdate(
+                    """
+                    CREATE TABLE usuarios_nova (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        nome TEXT NOT NULL UNIQUE,
+                        senha TEXT,
+                        senha_hash TEXT
+                    )
+                    """
+            );
+
+            statement.executeUpdate(
+                    """
+                    INSERT INTO usuarios_nova (
+                        id,
+                        nome,
+                        senha,
+                        senha_hash
+                    )
+                    SELECT
+                        id,
+                        nome,
+                        senha,
+                        senha_hash
+                    FROM usuarios
+                    """
+            );
+
+            statement.executeUpdate(
+                    "DROP TABLE usuarios"
+            );
+
+            statement.executeUpdate(
+                    """
+                    ALTER TABLE usuarios_nova
+                    RENAME TO usuarios
+                    """
+            );
+
+            System.out.println(
+                    "Tabela usuarios migrada com sucesso."
+            );
+        }
+    }
+
+    private static boolean colunaSenhaEhObrigatoria(
+            Statement statement
+    ) throws SQLException {
+
+        try (
+                var resultado =
+                        statement.executeQuery(
+                                "PRAGMA table_info(usuarios)"
+                        )
+        ) {
+
+            while (resultado.next()) {
+
+                String nomeColuna =
+                        resultado.getString("name");
+
+                if ("senha".equalsIgnoreCase(
+                        nomeColuna
+                )) {
+
+                    int notNull =
+                            resultado.getInt("notnull");
+
+                    return notNull == 1;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static void migrarTabelaMensagens(
+            Statement statement
+    ) throws SQLException {
+
+        boolean colunaEntregueExiste = false;
+        boolean colunaLidaExiste = false;
+
+        try (
+                var resultado =
+                        statement.executeQuery(
+                                "PRAGMA table_info(mensagens)"
+                        )
+        ) {
+
+            while (resultado.next()) {
+
+                String nomeColuna =
+                        resultado.getString("name");
+
+                if ("entregue".equalsIgnoreCase(
+                        nomeColuna
+                )) {
+
+                    colunaEntregueExiste = true;
+                }
+
+                if ("lida".equalsIgnoreCase(
+                        nomeColuna
+                )) {
+
+                    colunaLidaExiste = true;
+                }
+            }
+        }
+
+        if (!colunaEntregueExiste) {
+
+            statement.executeUpdate(
+                    """
+                    ALTER TABLE mensagens
+                    ADD COLUMN entregue
+                    INTEGER NOT NULL DEFAULT 0
+                    """
+            );
+
+            System.out.println(
+                    "Coluna 'entregue' adicionada à tabela mensagens."
+            );
+        }
+
+        if (!colunaLidaExiste) {
+
+            statement.executeUpdate(
+                    """
+                    ALTER TABLE mensagens
+                    ADD COLUMN lida
+                    INTEGER NOT NULL DEFAULT 0
+                    """
+            );
+
+            System.out.println(
+                    "Coluna 'lida' adicionada à tabela mensagens."
+            );
         }
     }
 
