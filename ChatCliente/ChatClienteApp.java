@@ -59,6 +59,15 @@ public class ChatClienteApp
             new HashMap<>();
 
     /*
+     * Guarda a quantidade de mensagens não
+     * lidas de cada contato.
+     *
+     * A chave é o nome do contato.
+     */
+    private final Map<String, Integer> mensagensNaoLidas =
+            new HashMap<>();
+
+    /*
      * Guarda os usuários que estão cadastrados
      * no sistema.
      */
@@ -182,6 +191,53 @@ public class ChatClienteApp
                     .add(
                             novaMensagem
                     );
+
+            /*
+             * Se a mensagem foi recebida de
+             * outro usuário e a conversa NÃO
+             * está aberta, aumenta o contador
+             * de mensagens não lidas.
+             */
+            if (!enviadaPorMim
+                    && (
+                    contatoAtual == null
+                            || !contatoMensagem.equalsIgnoreCase(
+                            contatoAtual
+                    )
+            )) {
+
+                int quantidadeAtual =
+                        mensagensNaoLidas.getOrDefault(
+                                remetente,
+                                0
+                        );
+
+                int novaQuantidade =
+                        quantidadeAtual + 1;
+
+                mensagensNaoLidas.put(
+                        remetente,
+                        novaQuantidade
+                );
+
+                System.out.println(
+                        "Mensagem não lida de "
+                                + remetente
+                                + ": "
+                                + novaQuantidade
+                );
+
+                /*
+                 * Atualiza visualmente o contador
+                 * na lista de contatos.
+                 */
+                Platform.runLater(() -> {
+
+                    atualizarContadorNaoLidasContato(
+                            remetente
+                    );
+                });
+            }
 
             Platform.runLater(() -> {
 
@@ -778,8 +834,26 @@ public class ChatClienteApp
                                 contatoSelecionado
                         );
 
+                /*
+                 * Ao abrir uma conversa,
+                 * todas as mensagens não lidas
+                 * daquele contato são consideradas
+                 * visualizadas.
+                 */
+                zerarMensagensNaoLidas(
+                        contatoAtual
+                );
+
+                /*
+                 * Atualiza visualmente o contato
+                 * para remover o contador.
+                 */
+                atualizarContadorNaoLidasContato(
+                        contatoAtual
+                );
+
                 nomeContato.setText(
-                        contatoSelecionado
+                        contatoAtual
                 );
 
                 indicadorDigitacao.setText(
@@ -1001,8 +1075,9 @@ public class ChatClienteApp
 
     /*
      * Monta visualmente a lista de contatos
-     * usando os usuários cadastrados e a
-     * informação de quem está online.
+     * usando os usuários cadastrados, o status
+     * online/offline e a quantidade de mensagens
+     * não lidas.
      */
     private void atualizarListaContatosVisual() {
 
@@ -1029,34 +1104,146 @@ public class ChatClienteApp
                 continue;
             }
 
-            boolean online =
-                    estaOnline(
-                            nomeUsuario
-                    );
-
-            String status;
-
-            if (online) {
-
-                status = "🟢 ";
-
-            } else {
-
-                status = "⚫ ";
-            }
-
             listaContatos
                     .getItems()
                     .add(
-                            status
-                                    + nomeUsuario
+                            formatarContato(
+                                    nomeUsuario
+                            )
                     );
+        }
+    }
+
+    /*
+     * Monta o texto visual de um contato.
+     *
+     * Exemplo:
+     *
+     * 🟢 Maria  3
+     *
+     * ou:
+     *
+     * ⚫ João
+     */
+    private String formatarContato(
+            String nomeUsuario
+    ) {
+
+        boolean online =
+                estaOnline(
+                        nomeUsuario
+                );
+
+        String status;
+
+        if (online) {
+
+            status = "🟢 ";
+
+        } else {
+
+            status = "⚫ ";
+        }
+
+        int quantidadeNaoLidas =
+                obterQuantidadeNaoLidas(
+                        nomeUsuario
+                );
+
+        String contador = "";
+
+        if (quantidadeNaoLidas > 0) {
+
+            contador =
+                    "  " + quantidadeNaoLidas;
+        }
+
+        return status
+                + nomeUsuario
+                + contador;
+    }
+
+    /*
+     * Retorna a quantidade de mensagens
+     * não lidas de determinado contato.
+     *
+     * A busca ignora diferença entre
+     * maiúsculas e minúsculas.
+     */
+    private int obterQuantidadeNaoLidas(
+            String nomeUsuario
+    ) {
+
+        if (nomeUsuario == null) {
+            return 0;
+        }
+
+        for (Map.Entry<String, Integer> entrada :
+                mensagensNaoLidas.entrySet()) {
+
+            if (entrada.getKey().equalsIgnoreCase(
+                    nomeUsuario
+            )) {
+
+                return entrada.getValue();
+            }
+        }
+
+        return 0;
+    }
+
+    /*
+     * Atualiza somente o contador visual
+     * de um contato.
+     */
+    private void atualizarContadorNaoLidasContato(
+            String nomeUsuario
+    ) {
+
+        if (listaContatos == null
+                || nomeUsuario == null) {
+
+            return;
+        }
+
+        for (int i = 0;
+             i < listaContatos.getItems().size();
+             i++) {
+
+            String contatoAtualLista =
+                    listaContatos
+                            .getItems()
+                            .get(i);
+
+            String nome =
+                    removerStatus(
+                            contatoAtualLista
+                    );
+
+            if (nome.equalsIgnoreCase(
+                    nomeUsuario
+            )) {
+
+                listaContatos
+                        .getItems()
+                        .set(
+                                i,
+                                formatarContato(
+                                        nome
+                                )
+                        );
+
+                break;
+            }
         }
     }
 
     /*
      * Atualiza somente o status visual
      * de um contato.
+     *
+     * O contador de mensagens não lidas
+     * é preservado.
      */
     private void atualizarStatusContato(
             String nomeUsuario,
@@ -1085,22 +1272,37 @@ public class ChatClienteApp
                     nomeUsuario
             )) {
 
-                String novoStatus;
-
+                /*
+                 * O parâmetro online já representa
+                 * o novo estado do usuário.
+                 *
+                 * Por isso atualizamos diretamente
+                 * o conjunto de usuários online
+                 * antes de montar o contato.
+                 */
                 if (online) {
 
-                    novoStatus = "🟢 ";
+                    usuariosOnline.add(
+                            nomeUsuario
+                    );
 
                 } else {
 
-                    novoStatus = "⚫ ";
+                    usuariosOnline.removeIf(
+                            usuario ->
+                                    usuario.equalsIgnoreCase(
+                                            nomeUsuario
+                                    )
+                    );
                 }
 
                 listaContatos
                         .getItems()
                         .set(
                                 i,
-                                novoStatus + nome
+                                formatarContato(
+                                        nome
+                                )
                         );
 
                 break;
@@ -1151,6 +1353,66 @@ public class ChatClienteApp
         }
 
         return false;
+    }
+
+    /*
+     * Zera a quantidade de mensagens não
+     * lidas de determinado contato.
+     */
+    private void zerarMensagensNaoLidas(
+            String nomeUsuario
+    ) {
+
+        if (nomeUsuario == null
+                || nomeUsuario.trim().isEmpty()) {
+
+            return;
+        }
+
+        String chaveEncontrada = null;
+
+        for (String chave :
+                mensagensNaoLidas.keySet()) {
+
+            if (chave.equalsIgnoreCase(
+                    nomeUsuario
+            )) {
+
+                chaveEncontrada = chave;
+
+                break;
+            }
+        }
+
+        if (chaveEncontrada == null) {
+
+            mensagensNaoLidas.put(
+                    nomeUsuario,
+                    0
+            );
+
+            return;
+        }
+
+        int quantidadeAtual =
+                mensagensNaoLidas.getOrDefault(
+                        chaveEncontrada,
+                        0
+                );
+
+        mensagensNaoLidas.put(
+                chaveEncontrada,
+                0
+        );
+
+        if (quantidadeAtual > 0) {
+
+            System.out.println(
+                    "Mensagens não lidas de "
+                            + nomeUsuario
+                            + " zeradas."
+            );
+        }
     }
 
     private void iniciarContadorParadaDigitacao() {
@@ -1617,9 +1879,60 @@ public class ChatClienteApp
             String contato
     ) {
 
-        return contato
-                .replace("🟢 ", "")
-                .replace("⚫ ", "");
+        if (contato == null) {
+            return null;
+        }
+
+        String resultado =
+                contato
+                        .replace("🟢 ", "")
+                        .replace("⚫ ", "");
+
+        /*
+         * Remove o contador visual do contato.
+         *
+         * Exemplo:
+         *
+         * Maria  3
+         *
+         * vira:
+         *
+         * Maria
+         */
+        int ultimaPosicaoEspaco =
+                resultado.lastIndexOf("  ");
+
+        if (ultimaPosicaoEspaco >= 0) {
+
+            String possivelNumero =
+                    resultado
+                            .substring(
+                                    ultimaPosicaoEspaco + 2
+                            )
+                            .trim();
+
+            try {
+
+                Integer.parseInt(
+                        possivelNumero
+                );
+
+                resultado =
+                        resultado.substring(
+                                0,
+                                ultimaPosicaoEspaco
+                        );
+
+            } catch (NumberFormatException e) {
+
+                /*
+                 * Não era um contador.
+                 * Mantém o nome original.
+                 */
+            }
+        }
+
+        return resultado.trim();
     }
 
     public static void main(String[] args) {
