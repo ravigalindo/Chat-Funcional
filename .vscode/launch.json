@@ -3,6 +3,20 @@
     "configurations": [
         {
             "type": "java",
+            "name": "TesteHMAC",
+            "request": "launch",
+            "mainClass": "ChatCliente.Seguranca.TesteHMAC",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
+            "name": "TesteAES",
+            "request": "launch",
+            "mainClass": "ChatCliente.Seguranca.TesteAES",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
             "name": "TesteVerificacaoArgon2",
             "request": "launch",
             "mainClass": "ChatServidor.Segurança.TesteVerificacaoArgon2",
