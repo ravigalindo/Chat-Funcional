@@ -63,9 +63,6 @@ public class TesteHMAC {
                         + mensagemValida
         );
 
-        /*
-         * Simula uma alteração na mensagem.
-         */
         String mensagemAlterada =
                 "Esta mensagem foi alterada.";
 
