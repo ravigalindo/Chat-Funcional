@@ -5,6 +5,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
 
@@ -16,10 +17,6 @@ public class GerenciadorHMAC {
     private static final int TAMANHO_CHAVE =
             256;
 
-    /*
-     * Gera uma chave aleatória de 256 bits
-     * para utilização pelo HMAC-SHA-256.
-     */
     public SecretKey gerarChave() {
 
         byte[] chaveBytes =
@@ -36,9 +33,6 @@ public class GerenciadorHMAC {
         );
     }
 
-    /*
-     * Gera o HMAC-SHA-256 de um texto.
-     */
     public String gerarHMAC(
             String texto,
             SecretKey chave
@@ -75,46 +69,46 @@ public class GerenciadorHMAC {
         }
     }
 
-    /*
-     * Verifica se o HMAC recebido corresponde
-     * ao conteúdo informado.
-     */
     public boolean verificarHMAC(
             String texto,
             String hmacRecebido,
             SecretKey chave
     ) {
 
-        String hmacCalculado =
-                gerarHMAC(
-                        texto,
-                        chave
-                );
+        try {
 
-        byte[] esperado =
-                Base64
-                        .getDecoder()
-                        .decode(
-                                hmacCalculado
-                        );
+            String hmacCalculado =
+                    gerarHMAC(
+                            texto,
+                            chave
+                    );
 
-        byte[] recebido =
-                Base64
-                        .getDecoder()
-                        .decode(
-                                hmacRecebido
-                        );
+            byte[] esperado =
+                    Base64
+                            .getDecoder()
+                            .decode(
+                                    hmacCalculado
+                            );
 
-        return java.security.MessageDigest
-                .isEqual(
-                        esperado,
-                        recebido
-                );
+            byte[] recebido =
+                    Base64
+                            .getDecoder()
+                            .decode(
+                                    hmacRecebido
+                            );
+
+            return MessageDigest
+                    .isEqual(
+                            esperado,
+                            recebido
+                    );
+
+        } catch (Exception e) {
+
+            return false;
+        }
     }
 
-    /*
-     * Converte uma chave HMAC para Base64.
-     */
     public String chaveParaBase64(
             SecretKey chave
     ) {
@@ -126,10 +120,6 @@ public class GerenciadorHMAC {
                 );
     }
 
-    /*
-     * Reconstrói uma chave HMAC a partir
-     * de uma representação Base64.
-     */
     public SecretKey base64ParaChave(
             String chaveBase64
     ) {
