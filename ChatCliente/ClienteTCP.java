@@ -4,7 +4,10 @@ import ChatCliente.Seguranca.GerenciadorAES;
 import ChatCliente.Seguranca.GerenciadorHMAC;
 import ChatCliente.Seguranca.GerenciadorAssinatura;
 import ChatCliente.Seguranca.HandshakeCliente;
+import ChatCliente.Seguranca.HandshakeE2EEPendente;
+import ChatCliente.Seguranca.GerenciadorSessoesE2EE;
 import ChatCliente.Seguranca.SessaoSegura;
+import ChatCliente.Seguranca.SessaoE2EE;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -12,7 +15,13 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.security.KeyPair;
+import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 public class ClienteTCP {
@@ -45,6 +54,16 @@ public class ClienteTCP {
 
     private KeyPair parChavesAssinatura;
 
+        private final GerenciadorSessoesE2EE gerenciadorSessoesE2EE;
+
+        private final Map<String, HandshakeE2EEPendente> handshakesE2EE;
+
+        private final Map<String, PublicKey> chavesPublicasContatos;
+
+        private final Map<String, String> desafiosE2EE;
+
+        private final Map<String, List<String>> mensagensPendentesE2EE;
+
     public ClienteTCP() {
 
         gerenciadorAES =
@@ -58,6 +77,21 @@ public class ClienteTCP {
 
         handshakeCliente =
                 new HandshakeCliente();
+
+        gerenciadorSessoesE2EE =
+                new GerenciadorSessoesE2EE();
+
+        handshakesE2EE =
+                new HashMap<>();
+
+        chavesPublicasContatos =
+                new HashMap<>();
+
+        desafiosE2EE =
+                new HashMap<>();
+
+        mensagensPendentesE2EE =
+                new HashMap<>();
     }
 
     public boolean conectar() {
@@ -542,6 +576,534 @@ public class ClienteTCP {
         }
     }
 
+    private boolean processarMensagemE2EE(
+            String mensagem
+    ) {
+
+        if (mensagem.startsWith("PUBLIC_KEY|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 3);
+
+            if (partes.length == 3) {
+
+                guardarChavePublica(
+                        partes[1],
+                        partes[2]
+                );
+
+                if (mensagensPendentesE2EE.containsKey(
+                        partes[1]
+                )) {
+
+                    iniciarHandshakeE2EE(
+                            partes[1]
+                    );
+                }
+            }
+
+            return true;
+        }
+
+        if (mensagem.startsWith("KEY_REQUESTED|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 3);
+
+            if (partes.length == 3) {
+
+                guardarChavePublica(
+                        partes[1],
+                        partes[2]
+                );
+            }
+
+            return true;
+        }
+
+        if (mensagem.startsWith("PUBLIC_KEY_CHANGED|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 2);
+
+            if (partes.length == 2) {
+
+                chavesPublicasContatos.remove(
+                        partes[1]
+                );
+
+                gerenciadorSessoesE2EE.remover(
+                        partes[1]
+                );
+
+                handshakesE2EE.remove(
+                        partes[1]
+                );
+            }
+
+            return true;
+        }
+
+        if (!mensagem.startsWith("E2EE_ROUTE|")) {
+            return false;
+        }
+
+        String[] partes =
+                mensagem.split("\\|", 5);
+
+        if (partes.length < 4) {
+            return true;
+        }
+
+        String contato = partes[1];
+        String comando = partes[2];
+
+        try {
+
+            if ("E2EE_HELLO".equals(comando)) {
+
+                if (partes.length < 5) {
+                    return true;
+                }
+
+                byte[] salt =
+                        Base64.getDecoder().decode(
+                                partes[3]
+                        );
+
+                HandshakeE2EEPendente pendente =
+                        gerenciadorSessoesE2EE
+                                .responderHandshake(
+                                        salt
+                                );
+
+                handshakesE2EE.put(
+                        contato,
+                        pendente
+                );
+
+                finalizarSessaoE2EE(
+                        contato,
+                        pendente,
+                        partes[4]
+                );
+
+                enviarMensagemSegura(
+                        "E2EE_HELLO_RESPONSE|"
+                                + contato
+                                + "|"
+                                + pendente.getSaltBase64()
+                                + "|"
+                                + handshakeCliente
+                                        .obterChavePublicaDH(
+                                                pendente.getParChavesDH()
+                                        )
+                );
+
+                enviarDesafioE2EE(
+                        contato
+                );
+
+                return true;
+            }
+
+            if ("E2EE_HELLO_RESPONSE".equals(comando)) {
+
+                if (partes.length < 5) {
+                    return true;
+                }
+
+                HandshakeE2EEPendente pendente =
+                        handshakesE2EE.get(
+                                contato
+                        );
+
+                if (pendente == null) {
+                    return true;
+                }
+
+                finalizarSessaoE2EE(
+                        contato,
+                        pendente,
+                        partes[4]
+                );
+
+                enviarDesafioE2EE(
+                        contato
+                );
+
+                return true;
+            }
+
+            if ("E2EE_AUTH_CHALLENGE".equals(comando)) {
+
+                if (partes.length < 4) {
+                    return true;
+                }
+
+                responderDesafioE2EE(
+                        contato,
+                        partes[3]
+                );
+
+                return true;
+            }
+
+            if ("E2EE_AUTH_RESPONSE".equals(comando)) {
+
+                if (partes.length < 5) {
+                    return true;
+                }
+
+                verificarRespostaE2EE(
+                        contato,
+                        partes[3],
+                        partes[4]
+                );
+
+                return true;
+            }
+
+        } catch (RuntimeException e) {
+
+            System.out.println(
+                    "Falha no controle E2EE: "
+                            + e.getMessage()
+            );
+        }
+
+        return true;
+    }
+
+    private void guardarChavePublica(
+            String contato,
+            String chaveBase64
+    ) {
+
+        chavesPublicasContatos.put(
+                contato,
+                gerenciadorAssinatura
+                        .base64ParaChavePublica(
+                                chaveBase64
+                        )
+        );
+    }
+
+    private void finalizarSessaoE2EE(
+            String contato,
+            HandshakeE2EEPendente pendente,
+            String chaveDHContato
+    ) {
+
+        PublicKey chavePublicaContato =
+                chavesPublicasContatos.get(
+                        contato
+                );
+
+        if (chavePublicaContato == null) {
+            return;
+        }
+
+        SessaoE2EE sessao =
+                gerenciadorSessoesE2EE
+                        .finalizarSessao(
+                                contato,
+                                pendente.getParChavesDH(),
+                                chaveDHContato,
+                                pendente.getSalt(),
+                                chavePublicaContato
+                        );
+
+        gerenciadorSessoesE2EE.guardar(
+                contato,
+                sessao
+        );
+    }
+
+    private void enviarDesafioE2EE(
+            String contato
+    ) {
+
+        byte[] bytes =
+                new byte[32];
+
+        new SecureRandom().nextBytes(bytes);
+
+        String nonce =
+                Base64.getEncoder().encodeToString(bytes);
+
+        desafiosE2EE.put(
+                contato,
+                nonce
+        );
+
+        enviarMensagemSegura(
+                "E2EE_AUTH_CHALLENGE|"
+                        + contato
+                        + "|"
+                        + nonce
+        );
+    }
+
+    private void responderDesafioE2EE(
+            String contato,
+            String nonce
+    ) {
+
+        if (parChavesAssinatura == null) {
+            return;
+        }
+
+        String assinatura =
+                gerenciadorAssinatura.assinar(
+                        nonce,
+                        parChavesAssinatura.getPrivate()
+                );
+
+        enviarMensagemSegura(
+                "E2EE_AUTH_RESPONSE|"
+                        + contato
+                        + "|"
+                        + nonce
+                        + "|"
+                        + assinatura
+        );
+    }
+
+    private void verificarRespostaE2EE(
+            String contato,
+            String nonce,
+            String assinatura
+    ) {
+
+        String nonceEsperado =
+                desafiosE2EE.get(
+                        contato
+                );
+
+        PublicKey chavePublica =
+                chavesPublicasContatos.get(
+                        contato
+                );
+
+        SessaoE2EE sessao =
+                gerenciadorSessoesE2EE.obter(
+                        contato
+                );
+
+        if (
+                nonceEsperado != null
+                        && nonceEsperado.equals(nonce)
+                        && chavePublica != null
+                        && sessao != null
+                        && gerenciadorAssinatura.verificar(
+                                nonce,
+                                assinatura,
+                                chavePublica
+                        )
+        ) {
+
+            sessao.marcarComoAutenticada();
+            desafiosE2EE.remove(contato);
+
+            System.out.println(
+                    "E2EE: contato autenticado: "
+                            + contato
+            );
+
+            enviarMensagensPendentesE2EE(
+                    contato
+            );
+        }
+    }
+
+    private void enviarMensagensPendentesE2EE(
+            String contato
+    ) {
+
+        List<String> pendentes =
+                mensagensPendentesE2EE.remove(
+                        contato
+                );
+
+        if (pendentes == null) {
+            return;
+        }
+
+        for (String conteudo : pendentes) {
+            enviarMensagem(
+                    contato,
+                    conteudo
+            );
+        }
+    }
+
+    private String descriptografarMensagemE2EE(
+            String mensagem
+    ) {
+
+        if (mensagem.startsWith("HISTORY_MESSAGE|")) {
+            return descriptografarHistoricoE2EE(
+                    mensagem
+            );
+        }
+
+        if (!mensagem.startsWith("MESSAGE|")) {
+            return null;
+        }
+
+        String[] partes =
+                mensagem.split("\\|", 4);
+
+        if (partes.length < 4
+                || !partes[3].startsWith("E2EE|")) {
+            return null;
+        }
+
+        String pacote =
+                partes[3].substring("E2EE|".length());
+
+        SessaoE2EE sessao =
+                gerenciadorSessoesE2EE.obter(
+                        partes[2]
+                );
+
+        if (sessao == null) {
+
+            for (SessaoE2EE candidata :
+                    gerenciadorSessoesE2EE.todas()) {
+
+                String texto =
+                        candidata.descriptografar(
+                                pacote
+                        );
+
+                if (texto != null) {
+                    return partes[0]
+                            + "|"
+                            + partes[1]
+                            + "|"
+                            + partes[2]
+                            + "|"
+                            + texto;
+                }
+            }
+
+            return null;
+        }
+
+        String texto =
+                sessao.descriptografar(
+                        pacote
+                );
+
+        if (texto == null) {
+            return null;
+        }
+
+        return partes[0]
+                + "|"
+                + partes[1]
+                + "|"
+                + partes[2]
+                + "|"
+                + texto;
+    }
+
+    private String descriptografarHistoricoE2EE(
+            String mensagem
+    ) {
+
+        String[] partes =
+                mensagem.split("\\|", 6);
+
+        if (partes.length < 6
+                || !partes[4].startsWith("E2EE|")) {
+            return null;
+        }
+
+        String texto =
+                descriptografarComSessoes(
+                        partes[2],
+                        partes[4].substring(
+                                "E2EE|".length()
+                        )
+                );
+
+        if (texto == null) {
+            return null;
+        }
+
+        return partes[0]
+                + "|"
+                + partes[1]
+                + "|"
+                + partes[2]
+                + "|"
+                + partes[3]
+                + "|"
+                + texto
+                + "|"
+                + partes[5];
+    }
+
+    private String descriptografarComSessoes(
+            String remetente,
+            String pacote
+    ) {
+
+        SessaoE2EE sessao =
+                gerenciadorSessoesE2EE.obter(
+                        remetente
+                );
+
+        if (sessao != null) {
+            return sessao.descriptografar(
+                    pacote
+            );
+        }
+
+        for (SessaoE2EE candidata :
+                gerenciadorSessoesE2EE.todas()) {
+
+            String texto =
+                    candidata.descriptografar(
+                            pacote
+                    );
+
+            if (texto != null) {
+                return texto;
+            }
+        }
+
+        return null;
+    }
+
+    private boolean possuiPayloadE2EE(
+            String mensagem
+    ) {
+
+        if (mensagem.startsWith("MESSAGE|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 4);
+
+            return partes.length >= 4
+                    && partes[3].startsWith("E2EE|");
+        }
+
+        if (mensagem.startsWith("HISTORY_MESSAGE|")) {
+
+            String[] partes =
+                    mensagem.split("\\|", 6);
+
+            return partes.length >= 6
+                    && partes[4].startsWith("E2EE|");
+        }
+
+        return false;
+    }
+
     public void iniciarRecebimento(
             Consumer<String> aoReceberMensagem
     ) {
@@ -573,6 +1135,32 @@ public class ClienteTCP {
                             ) {
 
                                 continue;
+                            }
+
+                            if (processarMensagemE2EE(
+                                    mensagemProcessada
+                            )) {
+
+                                continue;
+                            }
+
+                            String mensagemE2EE =
+                                    descriptografarMensagemE2EE(
+                                            mensagemProcessada
+                                    );
+
+                            if (
+                                    possuiPayloadE2EE(
+                                            mensagemProcessada
+                                    )
+                                    && mensagemE2EE == null
+                            ) {
+
+                                continue;
+                            }
+
+                            if (mensagemE2EE != null) {
+                                mensagemProcessada = mensagemE2EE;
                             }
 
                             if (
@@ -619,11 +1207,115 @@ public class ClienteTCP {
             return;
         }
 
+        SessaoE2EE sessaoE2EE =
+                gerenciadorSessoesE2EE.obter(
+                        destinatario
+                );
+
+        if (
+                sessaoE2EE == null
+                        || !sessaoE2EE.estaAutenticada()
+        ) {
+
+            mensagensPendentesE2EE
+                    .computeIfAbsent(
+                            destinatario,
+                            chave -> new ArrayList<>()
+                    )
+                    .add(
+                            conteudo
+                    );
+
+            System.out.println(
+                    "E2EE: mensagem aguardando handshake com "
+                            + destinatario
+            );
+
+            iniciarHandshakeE2EE(
+                    destinatario
+            );
+
+            return;
+        }
+
+        String mensagemCifrada =
+                sessaoE2EE.criptografar(
+                        conteudo
+                );
+
         enviarMensagemSegura(
                 "MESSAGE|"
                         + destinatario
+                        + "|E2EE|"
+                        + mensagemCifrada
+        );
+
+        System.out.println(
+                "E2EE: mensagem cifrada enviada para "
+                        + destinatario
+        );
+    }
+
+    public void solicitarChavePublica(
+            String contato
+    ) {
+
+        if (!sessaoSeguraValida()) {
+            return;
+        }
+
+        enviarMensagemSegura(
+                "PUBLIC_KEY_REQUEST|"
+                        + contato
+        );
+    }
+
+    public void iniciarHandshakeE2EE(
+            String contato
+    ) {
+
+        PublicKey chavePublica =
+                chavesPublicasContatos.get(
+                        contato
+                );
+
+        if (chavePublica == null) {
+
+                        System.out.println(
+                                        "E2EE: solicitando chave pública de "
+                                                        + contato
+                        );
+
+            solicitarChavePublica(
+                    contato
+            );
+
+            return;
+        }
+
+        HandshakeE2EEPendente pendente =
+                gerenciadorSessoesE2EE
+                        .iniciarHandshake();
+
+        handshakesE2EE.put(
+                contato,
+                pendente
+        );
+
+        System.out.println(
+                "E2EE: iniciando handshake com "
+                        + contato
+        );
+
+        enviarMensagemSegura(
+                "E2EE_HELLO|"
+                        + contato
                         + "|"
-                        + conteudo
+                        + pendente.getSaltBase64()
+                        + "|"
+                        + handshakeCliente.obterChavePublicaDH(
+                                pendente.getParChavesDH()
+                        )
         );
     }
 
@@ -719,5 +1411,10 @@ public class ClienteTCP {
                             + e.getMessage()
             );
         }
+
+                gerenciadorSessoesE2EE.limpar();
+                handshakesE2EE.clear();
+                desafiosE2EE.clear();
+                mensagensPendentesE2EE.clear();
     }
 }
