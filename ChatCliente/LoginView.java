@@ -99,59 +99,62 @@ public class LoginView {
                             senha
                     );
 
-            if (
-                    resposta != null
-                            && resposta.startsWith(
-                                    "LOGIN_OK|"
-                            )
-            ) {
+            finalizarLogin(
+                    resposta,
+                    usuario,
+                    senha,
+                    mensagemStatus
+            );
+        });
 
-                Usuario usuarioAutenticado =
-                        new Usuario(
-                                usuario,
-                                senha
-                        );
+        Button botaoNovoDispositivo =
+                new Button("Entrar em novo dispositivo");
 
-                sessao.iniciarSessao(
-                        usuarioAutenticado
-                );
+        botaoNovoDispositivo.setOnAction(event -> {
 
-                clienteTCP.iniciarRecebimento(
-                        mensagem -> {
+            String usuario =
+                    campoUsuario
+                            .getText()
+                            .trim();
 
-                            aplicativo.receberMensagemServidor(
-                                    mensagem
-                            );
-                        }
-                );
+            String senha =
+                    campoSenha
+                            .getText();
 
-                aplicativo.mostrarChat(
-                        stage
-                );
-
-            } else if (
-                    resposta != null
-                            && resposta.startsWith(
-                                    "LOGIN_ERROR|"
-                            )
-            ) {
+            if (usuario.isEmpty()
+                    || senha.isEmpty()) {
 
                 mensagemStatus.setText(
-                        resposta.substring(
-                                "LOGIN_ERROR|".length()
-                        )
+                        "Digite usuário e senha."
                 );
 
-                clienteTCP.desconectar();
-
-            } else {
-
-                mensagemStatus.setText(
-                        "Servidor não respondeu corretamente."
-                );
-
-                clienteTCP.desconectar();
+                return;
             }
+
+            boolean conectado =
+                    clienteTCP.conectar();
+
+            if (!conectado) {
+
+                mensagemStatus.setText(
+                        "Não foi possível conectar ao servidor."
+                );
+
+                return;
+            }
+
+            String resposta =
+                    clienteTCP.fazerLoginNovoDispositivo(
+                            usuario,
+                            senha
+                    );
+
+            finalizarLogin(
+                    resposta,
+                    usuario,
+                    senha,
+                    mensagemStatus
+            );
         });
 
         Button botaoCadastro =
@@ -178,6 +181,7 @@ public class LoginView {
                         labelSenha,
                         campoSenha,
                         botaoEntrar,
+                        botaoNovoDispositivo,
                         mensagemStatus,
                         botaoCadastro
                 );
@@ -207,5 +211,68 @@ public class LoginView {
 
         stage.setScene(scene);
         stage.show();
+    }
+
+    private void finalizarLogin(
+            String resposta,
+            String nomeUsuario,
+            String senha,
+            Label mensagemStatus
+    ) {
+
+        if (
+                resposta != null
+                        && resposta.startsWith(
+                                "LOGIN_OK|"
+                        )
+        ) {
+
+            Usuario usuarioAutenticado =
+                    new Usuario(
+                            nomeUsuario,
+                            senha
+                    );
+
+            sessao.iniciarSessao(
+                    usuarioAutenticado
+            );
+
+            clienteTCP.iniciarRecebimento(
+                    mensagem -> {
+
+                        aplicativo.receberMensagemServidor(
+                                mensagem
+                        );
+                    }
+            );
+
+            aplicativo.mostrarChat(
+                    stage
+            );
+
+            return;
+        }
+
+        if (
+                resposta != null
+                        && resposta.startsWith(
+                                "LOGIN_ERROR|"
+                        )
+        ) {
+
+            mensagemStatus.setText(
+                    resposta.substring(
+                            "LOGIN_ERROR|".length()
+                    )
+            );
+
+        } else {
+
+            mensagemStatus.setText(
+                    "Servidor não respondeu corretamente."
+            );
+        }
+
+        clienteTCP.desconectar();
     }
 }
