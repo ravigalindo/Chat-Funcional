@@ -674,7 +674,8 @@ public class ChatClienteApp
 
             Platform.runLater(() -> {
 
-                if (contatoAtual != null
+                if (indicadorDigitacao != null
+                        && contatoAtual != null
                         && nomeUsuario.equalsIgnoreCase(
                                 contatoAtual
                         )) {
@@ -712,7 +713,8 @@ public class ChatClienteApp
 
             Platform.runLater(() -> {
 
-                if (contatoAtual != null
+                if (indicadorDigitacao != null
+                        && contatoAtual != null
                         && nomeUsuario.equalsIgnoreCase(
                                 contatoAtual
                         )) {
@@ -1457,7 +1459,7 @@ public class ChatClienteApp
                     }
 
                 },
-                1000
+                2000
         );
     }
 

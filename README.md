@@ -60,9 +60,14 @@ Em desenvolvimento, com o chat funcional e as camadas de segurança do Projeto 2
 - Mensagens e histórico trafegados como payload interno cifrado, mantendo a camada do canal externo.
 - Mensagens offline armazenadas pelo servidor sem acesso ao conteúdo interno.
 - Invalidação das sessões quando um contato troca a chave pública ao entrar em novo dispositivo.
+- Chaves privadas Ed25519 persistidas localmente em arquivo cifrado para permitir login após reiniciar o cliente.
 
 ## Pendências conhecidas
 
 - Executar testes de integração com duas instâncias do cliente, incluindo rehandshake e mensagens offline.
 - Melhorar a indicação visual de falhas de handshake e de contato sem sessão E2EE.
 - Revisar o fluxo GitHub de issues, commits com `Ref #<id>` e merge na `main` conforme o PDF.
+
+## Migração de clientes antigos
+
+Clientes cadastrados antes da persistência local da chave privada não possuem uma cópia recuperável da chave usada no cadastro. Esses dispositivos devem usar uma vez a opção `Entrar em novo dispositivo`, informando a senha, para gerar uma nova chave, atualizá-la no servidor e criar o arquivo local cifrado.

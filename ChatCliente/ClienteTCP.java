@@ -54,6 +54,8 @@ public class ClienteTCP {
 
     private KeyPair parChavesAssinatura;
 
+        private final ChaveAssinaturaLocal chaveAssinaturaLocal;
+
         private final GerenciadorSessoesE2EE gerenciadorSessoesE2EE;
 
         private final Map<String, HandshakeE2EEPendente> handshakesE2EE;
@@ -85,6 +87,9 @@ public class ClienteTCP {
 
         handshakeCliente =
                 new HandshakeCliente();
+
+        chaveAssinaturaLocal =
+                new ChaveAssinaturaLocal();
 
         gerenciadorSessoesE2EE =
                 new GerenciadorSessoesE2EE();
@@ -291,9 +296,19 @@ public class ClienteTCP {
                 comando
         );
 
-        return lerRespostaSegura(
+        String resposta = lerRespostaSegura(
                 "cadastro"
         );
+
+        if ("REGISTER_OK".equals(resposta)) {
+            chaveAssinaturaLocal.salvar(
+                    nomeUsuario,
+                    senha,
+                    parChavesAssinatura
+            );
+        }
+
+        return resposta;
     }
 
     public String fazerLogin(
@@ -317,6 +332,15 @@ public class ClienteTCP {
          * apenas para manter a compatibilidade
          * com a chamada atual da interface.
          */
+        if (parChavesAssinatura == null) {
+
+            parChavesAssinatura =
+                    chaveAssinaturaLocal.carregar(
+                            nomeUsuario,
+                            senha
+                    );
+        }
+
         if (parChavesAssinatura == null) {
 
             System.out.println(
@@ -442,6 +466,12 @@ public class ClienteTCP {
     ) {
         parChavesAssinatura =
                 novoParChaves;
+
+        chaveAssinaturaLocal.salvar(
+                nomeUsuario,
+                senha,
+                novoParChaves
+        );
     }
 
     return resposta;
@@ -595,9 +625,32 @@ public class ClienteTCP {
                 return null;
             }
 
-            return processarMensagemSegura(
-                    resposta
-            );
+            String mensagemProcessada =
+                    processarMensagemSegura(
+                            resposta
+                    );
+
+            if (mensagemProcessada == null) {
+                return null;
+            }
+
+            if (processarMensagemRenovacao(
+                    mensagemProcessada
+            )) {
+                return lerRespostaSegura(
+                        operacao
+                );
+            }
+
+            if (processarMensagemE2EE(
+                    mensagemProcessada
+            )) {
+                return lerRespostaSegura(
+                        operacao
+                );
+            }
+
+            return mensagemProcessada;
 
         } catch (IOException e) {
 
@@ -1494,6 +1547,11 @@ public class ClienteTCP {
                 "TYPING|"
                         + destinatario
         );
+
+        System.out.println(
+                "Presença: digitando para "
+                        + destinatario
+        );
     }
 
     public void enviarParadaDigitacao(
@@ -1506,6 +1564,11 @@ public class ClienteTCP {
 
         enviarMensagemSegura(
                 "STOP_TYPING|"
+                        + destinatario
+        );
+
+        System.out.println(
+                "Presença: parou de digitar para "
                         + destinatario
         );
     }
