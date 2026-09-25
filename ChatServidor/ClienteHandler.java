@@ -2104,6 +2104,13 @@ public class ClienteHandler implements Runnable {
             return;
         }
 
+        System.out.println(
+                "Presença: "
+                        + nomeUsuario
+                        + " está digitando para "
+                        + destinatario
+        );
+
         clienteDestino.enviarMensagem(
                 "TYPING|"
                         + nomeUsuario
@@ -2129,6 +2136,13 @@ public class ClienteHandler implements Runnable {
         if (clienteDestino == null) {
             return;
         }
+
+        System.out.println(
+                "Presença: "
+                        + nomeUsuario
+                        + " parou de digitar para "
+                        + destinatario
+        );
 
         clienteDestino.enviarMensagem(
                 "STOP_TYPING|"
