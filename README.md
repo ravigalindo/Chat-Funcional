@@ -68,6 +68,10 @@ Em desenvolvimento, com o chat funcional e as camadas de segurança do Projeto 2
 - Melhorar a indicação visual de falhas de handshake e de contato sem sessão E2EE.
 - Revisar o fluxo GitHub de issues, commits com `Ref #<id>` e merge na `main` conforme o PDF.
 
+## Teste local de persistência
+
+Depois de compilar o projeto, execute `ChatCliente.TestePersistenciaSegura` para verificar a gravação e leitura do histórico AES-GCM e a recuperação da chave Ed25519 local.
+
 ## Migração de clientes antigos
 
 Clientes cadastrados antes da persistência local da chave privada não possuem uma cópia recuperável da chave usada no cadastro. Esses dispositivos devem usar uma vez a opção `Entrar em novo dispositivo`, informando a senha, para gerar uma nova chave, atualizá-la no servidor e criar o arquivo local cifrado.

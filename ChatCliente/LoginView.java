@@ -34,6 +34,12 @@ public class LoginView {
         Label titulo =
                 new Label("CHAT DE SEGURANÇA");
 
+        titulo.setStyle(
+                "-fx-text-fill: #17324d;"
+                        + "-fx-font-size: 24px;"
+                        + "-fx-font-weight: bold;"
+        );
+
         Label labelUsuario =
                 new Label("Usuário");
 
@@ -185,6 +191,28 @@ public class LoginView {
                         mensagemStatus,
                         botaoCadastro
                 );
+
+        layout.setStyle(
+                "-fx-background-color: #f4f7fb;"
+        );
+
+        botaoEntrar.setStyle(
+                "-fx-background-color: #176b87;"
+                        + "-fx-text-fill: white;"
+                        + "-fx-font-weight: bold;"
+                        + "-fx-padding: 10 18;"
+        );
+
+        botaoNovoDispositivo.setStyle(
+                "-fx-background-color: #dceaf0;"
+                        + "-fx-text-fill: #17324d;"
+                        + "-fx-padding: 9 14;"
+        );
+
+        botaoCadastro.setStyle(
+                "-fx-background-color: transparent;"
+                        + "-fx-text-fill: #176b87;"
+        );
 
         layout.setPadding(
                 new Insets(30)
