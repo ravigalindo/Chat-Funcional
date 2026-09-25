@@ -350,12 +350,17 @@ public class ClienteHandler implements Runnable {
 
         try {
 
-            return gerenciadorAES.descriptografar(
+            String mensagemDescriptografada =
+                    gerenciadorAES.descriptografar(
                     ciphertext,
                     sessaoSegura
                             .getChaveAES()
                             .getEncoded()
-            );
+                    );
+
+            sessaoSegura.registrarMensagem();
+
+            return mensagemDescriptografada;
 
         } catch (RuntimeException e) {
 
@@ -498,6 +503,10 @@ public class ClienteHandler implements Runnable {
                 processarParadaDigitacao(partes);
                 break;
 
+                        case "REKEY_REQUEST":
+                                processarPedidoRenovacao(partes);
+                                break;
+
                         case "E2EE_HELLO":
                         case "E2EE_HELLO_RESPONSE":
                         case "E2EE_AUTH_CHALLENGE":
@@ -509,6 +518,58 @@ public class ClienteHandler implements Runnable {
                 enviarMensagem(
                         "ERRO|Comando desconhecido"
                 );
+        }
+    }
+
+    private void processarPedidoRenovacao(
+            String[] partes
+    ) {
+
+        if (partes.length < 3) {
+            return;
+        }
+
+        try {
+            String saltBase64 = partes[1];
+            String chavePublicaCliente = partes[2];
+
+            SessaoSeguraServidor sessaoAnterior =
+                    sessaoSegura;
+
+            var parDH =
+                    handshakeServidor.gerarParDH();
+
+            SessaoSeguraServidor novaSessao =
+                    handshakeServidor.finalizarHandshake(
+                            parDH,
+                            chavePublicaCliente,
+                            saltBase64
+                    );
+
+            enviarMensagemComSessao(
+                    "REKEY_RESPONSE|"
+                            + handshakeServidor
+                                    .obterChavePublicaDH(
+                                            parDH
+                                    )
+                            + "|"
+                            + saltBase64,
+                    sessaoAnterior
+            );
+
+            sessaoSegura = novaSessao;
+
+            System.out.println(
+                    "Sessão segura renovada para o cliente: "
+                            + cliente.getInetAddress()
+                                    .getHostAddress()
+            );
+
+        } catch (RuntimeException e) {
+            System.out.println(
+                    "Erro ao renovar sessão segura: "
+                            + e.getMessage()
+            );
         }
     }
 
@@ -2111,6 +2172,40 @@ public class ClienteHandler implements Runnable {
         );
 
         sessaoSegura.registrarMensagem();
+    }
+
+    private void enviarMensagemComSessao(
+            String mensagem,
+            SessaoSeguraServidor sessao
+    ) {
+
+        if (
+                saida == null
+                        || sessao == null
+        ) {
+            return;
+        }
+
+        String ciphertext =
+                gerenciadorAES.criptografar(
+                        mensagem,
+                        sessao.getChaveAES().getEncoded()
+                );
+
+        String hmac =
+                gerenciadorHMAC.gerarHMAC(
+                        ciphertext,
+                        sessao.getChaveHMAC().getEncoded()
+                );
+
+        saida.println(
+                "SECURE|"
+                        + ciphertext
+                        + "|"
+                        + hmac
+        );
+
+        sessao.registrarMensagem();
     }
 
     public String getNomeUsuario() {

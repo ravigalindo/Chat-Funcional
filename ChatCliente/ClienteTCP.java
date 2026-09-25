@@ -64,6 +64,14 @@ public class ClienteTCP {
 
         private final Map<String, List<String>> mensagensPendentesE2EE;
 
+        private KeyPair parDHRenovacao;
+
+        private byte[] saltRenovacao;
+
+        private boolean renovacaoEmAndamento;
+
+        private final List<String> mensagensSegurasPendentes;
+
     public ClienteTCP() {
 
         gerenciadorAES =
@@ -92,6 +100,9 @@ public class ClienteTCP {
 
         mensagensPendentesE2EE =
                 new HashMap<>();
+
+        mensagensSegurasPendentes =
+                new ArrayList<>();
     }
 
     public boolean conectar() {
@@ -444,6 +455,23 @@ public class ClienteTCP {
             return;
         }
 
+                boolean comandoRenovacao =
+                                mensagem.startsWith("REKEY_REQUEST|")
+                                                || mensagem.startsWith("REKEY_RESPONSE|");
+
+                if (!comandoRenovacao && renovacaoEmAndamento) {
+                        mensagensSegurasPendentes.add(mensagem);
+                        return;
+                }
+
+                if (!comandoRenovacao
+                                && sessaoSegura.precisaRenovar()) {
+
+                        mensagensSegurasPendentes.add(mensagem);
+                        iniciarRenovacaoSessao();
+                        return;
+                }
+
         String ciphertext =
                 gerenciadorAES.criptografar(
                         mensagem,
@@ -467,6 +495,90 @@ public class ClienteTCP {
         );
 
         sessaoSegura.registrarMensagem();
+    }
+
+    private void iniciarRenovacaoSessao() {
+
+        if (renovacaoEmAndamento) {
+            return;
+        }
+
+        parDHRenovacao =
+                handshakeCliente.gerarParDH();
+
+        saltRenovacao =
+                handshakeCliente.gerarSalt();
+
+        renovacaoEmAndamento = true;
+
+        enviarMensagemSegura(
+                "REKEY_REQUEST|"
+                        + Base64.getEncoder().encodeToString(
+                                saltRenovacao
+                        )
+                        + "|"
+                        + handshakeCliente.obterChavePublicaDH(
+                                parDHRenovacao
+                        )
+        );
+
+        System.out.println(
+                "Sessão segura: renovação solicitada."
+        );
+    }
+
+    private boolean processarMensagemRenovacao(
+            String mensagem
+    ) {
+
+        if (!mensagem.startsWith("REKEY_RESPONSE|")) {
+            return false;
+        }
+
+        String[] partes =
+                mensagem.split("\\|", 3);
+
+        if (partes.length < 3
+                || parDHRenovacao == null
+                || saltRenovacao == null) {
+            return true;
+        }
+
+        try {
+            sessaoSegura =
+                    handshakeCliente.finalizarHandshake(
+                            parDHRenovacao,
+                            partes[1],
+                            saltRenovacao
+                    );
+
+            parDHRenovacao = null;
+            saltRenovacao = null;
+            renovacaoEmAndamento = false;
+
+            List<String> pendentes =
+                    new ArrayList<>(
+                            mensagensSegurasPendentes
+                    );
+
+            mensagensSegurasPendentes.clear();
+
+            System.out.println(
+                    "Sessão segura: renovação concluída."
+            );
+
+            for (String pendente : pendentes) {
+                enviarMensagemSegura(pendente);
+            }
+
+        } catch (RuntimeException e) {
+            System.out.println(
+                    "Sessão segura: falha na renovação: "
+                            + e.getMessage()
+            );
+        }
+
+        return true;
     }
 
     private String lerRespostaSegura(
@@ -562,6 +674,8 @@ public class ClienteTCP {
                             ciphertext,
                             sessaoSegura.getChaveAES()
                     );
+
+            sessaoSegura.registrarMensagem();
 
             return mensagemDescriptografada;
 
@@ -1137,6 +1251,13 @@ public class ClienteTCP {
                                 continue;
                             }
 
+                                                        if (processarMensagemRenovacao(
+                                                                        mensagemProcessada
+                                                        )) {
+
+                                                                continue;
+                                                        }
+
                             if (processarMensagemE2EE(
                                     mensagemProcessada
                             )) {
@@ -1416,5 +1537,9 @@ public class ClienteTCP {
                 handshakesE2EE.clear();
                 desafiosE2EE.clear();
                 mensagensPendentesE2EE.clear();
+                mensagensSegurasPendentes.clear();
+                parDHRenovacao = null;
+                saltRenovacao = null;
+                renovacaoEmAndamento = false;
     }
 }

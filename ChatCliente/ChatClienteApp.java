@@ -58,6 +58,8 @@ public class ChatClienteApp
     private final Map<String, List<Mensagem>> historicoConversas =
             new HashMap<>();
 
+        private HistoricoLocalCriptografado persistenciaHistorico;
+
     /*
      * Guarda a quantidade de mensagens não
      * lidas de cada contato.
@@ -191,6 +193,8 @@ public class ChatClienteApp
                     .add(
                             novaMensagem
                     );
+
+            salvarHistoricoLocal();
 
             /*
              * Se a mensagem foi recebida de
@@ -408,6 +412,8 @@ public class ChatClienteApp
                     .add(
                             mensagemHistorico
                     );
+
+            salvarHistoricoLocal();
 
             Platform.runLater(() -> {
 
@@ -725,6 +731,16 @@ public class ChatClienteApp
 
         Usuario usuarioLogado =
                 sessao.getUsuarioLogado();
+
+        persistenciaHistorico =
+                new HistoricoLocalCriptografado(
+                        usuarioLogado.getNome(),
+                        usuarioLogado.getSenha()
+                );
+
+        historicoConversas.putAll(
+                persistenciaHistorico.carregar()
+        );
 
         Label usuarioLogadoLabel =
                 new Label(
@@ -1795,7 +1811,18 @@ public class ChatClienteApp
                             mensagem.getId() == id
             );
         }
+
+                salvarHistoricoLocal();
     }
+
+        private void salvarHistoricoLocal() {
+
+                if (persistenciaHistorico != null) {
+                        persistenciaHistorico.salvar(
+                                        historicoConversas
+                        );
+                }
+        }
 
     /*
      * Remove a mensagem correspondente ao ID

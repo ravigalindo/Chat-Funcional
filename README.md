@@ -17,10 +17,34 @@ Aplicação de chat desenvolvida em Java, composta por um cliente desktop e um s
 
 - `ChatCliente` — aplicação do cliente
 - `ChatServidor` — aplicação do servidor
+- `lib` — dependências externas, incluindo SQLite e Password4j
+
+## Arquitetura
+
+### Cliente
+
+- Apresentação: `ChatClienteApp`, `LoginView` e `CadastroView`.
+- Serviço: sessão do usuário, conversas, presença e coordenação do E2EE.
+- Rede e protocolo: `ClienteTCP`, thread de recepção e pacotes protegidos.
+- Segurança: classes em `ChatCliente/Seguranca`, sessões do servidor e sessões por contato.
+- Persistência: `HistoricoLocalCriptografado`, que grava o histórico local com AES-GCM.
+
+### Servidor
+
+- Serviço: `ClienteHandler` e `GerenciadorClientes`, responsáveis por autenticação, presença, roteamento e fila offline.
+- Rede e protocolo: sockets TCP e uma thread por cliente.
+- Persistência: `ConexaoSQLite`, `GerenciadorUsuariosBanco` e banco SQLite.
+- Segurança: classes em `ChatServidor/Segurança`, responsáveis pelas primitivas e pela sessão do canal.
+
+## Execução
+
+1. Inicie `ChatServidor.ChatServidor`.
+2. Inicie `ChatCliente.ChatClienteApp` em duas instâncias para testar uma conversa.
+3. Use a mesma porta TCP `5000` e mantenha a pasta `lib` no classpath.
 
 ## Status
 
-Em desenvolvimento, com o canal seguro entre cliente e servidor implementado.
+Em desenvolvimento, com o chat funcional e as camadas de segurança do Projeto 2 em implementação.
 
 ## Segurança implementada nesta etapa
 
@@ -37,8 +61,8 @@ Em desenvolvimento, com o canal seguro entre cliente e servidor implementado.
 - Mensagens offline armazenadas pelo servidor sem acesso ao conteúdo interno.
 - Invalidação das sessões quando um contato troca a chave pública ao entrar em novo dispositivo.
 
-## Próxima etapa
+## Pendências conhecidas
 
-A persistência local da chave do histórico ainda precisa ser definida para que o histórico sobreviva ao encerramento do cliente. Também falta concluir a interface de estados do handshake, para informar ao usuário quando um contato ainda não pode receber mensagens.
-
-A renovação de sessões após 60 minutos ou 100 mensagens também requer um protocolo específico de rehandshake no canal já protegido; por isso, não é simulada por uma simples desconexão.
+- Executar testes de integração com duas instâncias do cliente, incluindo rehandshake e mensagens offline.
+- Melhorar a indicação visual de falhas de handshake e de contato sem sessão E2EE.
+- Revisar o fluxo GitHub de issues, commits com `Ref #<id>` e merge na `main` conforme o PDF.
