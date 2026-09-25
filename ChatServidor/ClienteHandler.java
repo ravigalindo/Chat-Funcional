@@ -1,15 +1,23 @@
 package ChatServidor;
 
+import ChatServidor.Segurança.GerenciadorAES;
+import ChatServidor.Segurança.GerenciadorHMAC;
+import ChatServidor.Segurança.GerenciadorAssinatura;
+import ChatServidor.Segurança.HandshakeServidor;
+import ChatServidor.Segurança.SessaoSeguraServidor;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Base64;
 import java.util.List;
 
 public class ClienteHandler implements Runnable {
@@ -24,18 +32,56 @@ public class ClienteHandler implements Runnable {
 
     private PrintWriter saida;
 
+    private SessaoSeguraServidor sessaoSegura;
+
+    private final GerenciadorAES gerenciadorAES;
+
+    private final GerenciadorHMAC gerenciadorHMAC;
+
+    private final GerenciadorAssinatura gerenciadorAssinatura;
+
+    private final HandshakeServidor handshakeServidor;
+
+    /*
+     * Usuário que está aguardando a resposta
+     * do desafio de autenticação.
+     */
+    private String usuarioLoginPendente;
+
+    /*
+     * Nonce enviado ao cliente.
+     *
+     * Ele é descartado depois que a autenticação
+     * termina.
+     */
+    private String nonceLogin;
+
     public ClienteHandler(
             Socket cliente,
             GerenciadorClientes gerenciador,
             GerenciadorUsuariosBanco gerenciadorUsuariosBanco
     ) {
 
-        this.cliente = cliente;
+        this.cliente =
+                cliente;
 
-        this.gerenciador = gerenciador;
+        this.gerenciador =
+                gerenciador;
 
         this.gerenciadorUsuariosBanco =
                 gerenciadorUsuariosBanco;
+
+        this.gerenciadorAES =
+                new GerenciadorAES();
+
+        this.gerenciadorHMAC =
+                new GerenciadorHMAC();
+
+        this.gerenciadorAssinatura =
+                new GerenciadorAssinatura();
+
+        this.handshakeServidor =
+                new HandshakeServidor();
     }
 
     @Override
@@ -69,7 +115,9 @@ public class ClienteHandler implements Runnable {
                             entrada.readLine()) != null
             ) {
 
-                processarMensagem(mensagem);
+                processarMensagem(
+                        mensagem
+                );
             }
 
         } catch (IOException e) {
@@ -81,7 +129,9 @@ public class ClienteHandler implements Runnable {
 
         } finally {
 
-            gerenciador.removerCliente(this);
+            gerenciador.removerCliente(
+                    this
+            );
 
             try {
 
@@ -105,8 +155,295 @@ public class ClienteHandler implements Runnable {
             String mensagem
     ) {
 
+        /*
+         * O primeiro comando da conexão precisa
+         * ser o CLIENT_HELLO.
+         */
+        if (sessaoSegura == null) {
+
+            if (
+                    mensagem.startsWith(
+                            "CLIENT_HELLO|"
+                    )
+            ) {
+
+                processarClientHello(
+                        mensagem
+                );
+
+            } else {
+
+                saida.println(
+                        "ERRO|Handshake seguro não estabelecido"
+                );
+            }
+
+            return;
+        }
+
+        /*
+         * Depois do handshake, somente pacotes
+         * SECURE são aceitos.
+         */
+        if (
+                !mensagem.startsWith(
+                        "SECURE|"
+                )
+        ) {
+
+            saida.println(
+                    "ERRO|Mensagem não protegida rejeitada"
+            );
+
+            return;
+        }
+
+        String mensagemDescriptografada =
+                descriptografarMensagem(
+                        mensagem
+                );
+
+        if (
+                mensagemDescriptografada
+                        == null
+        ) {
+
+            return;
+        }
+
+        processarMensagemInterna(
+                mensagemDescriptografada
+        );
+    }
+
+    private void processarClientHello(
+            String mensagem
+    ) {
+
         String[] partes =
-                mensagem.split("\\|", 3);
+                mensagem.split(
+                        "\\|",
+                        3
+                );
+
+        if (partes.length < 3) {
+
+            saida.println(
+                    "ERRO|CLIENT_HELLO inválido"
+            );
+
+            return;
+        }
+
+        String chavePublicaCliente =
+                partes[1];
+
+        String saltBase64 =
+                partes[2];
+
+        try {
+
+            /*
+             * O servidor gera seu par DH.
+             */
+            var parDH =
+                    handshakeServidor.gerarParDH();
+
+            /*
+             * O servidor deriva suas chaves usando:
+             *
+             * segredo DH + salt enviado pelo cliente.
+             */
+            sessaoSegura =
+                    handshakeServidor.finalizarHandshake(
+                            parDH,
+                            chavePublicaCliente,
+                            saltBase64
+                    );
+
+            String chavePublicaServidor =
+                    handshakeServidor
+                            .obterChavePublicaDH(
+                                    parDH
+                            );
+
+            /*
+             * SERVER_HELLO também faz parte do
+             * handshake inicial e ainda não é
+             * criptografado.
+             */
+            saida.println(
+                    "SERVER_HELLO|"
+                            + chavePublicaServidor
+            );
+
+            System.out.println(
+                    "Handshake seguro estabelecido com cliente: "
+                            + cliente.getInetAddress()
+                                    .getHostAddress()
+            );
+
+        } catch (Exception e) {
+
+            sessaoSegura =
+                    null;
+
+            saida.println(
+                    "ERRO|Falha no handshake seguro"
+            );
+
+            System.out.println(
+                    "Erro ao processar CLIENT_HELLO: "
+                            + e.getMessage()
+            );
+        }
+    }
+
+    private String descriptografarMensagem(
+            String mensagem
+    ) {
+
+        String[] partes =
+                mensagem.split(
+                        "\\|",
+                        3
+                );
+
+        if (partes.length < 3) {
+
+            System.out.println(
+                    "Pacote SECURE inválido."
+            );
+
+            return null;
+        }
+
+        String ciphertext =
+                partes[1];
+
+        String hmacRecebido =
+                partes[2];
+
+        /*
+         * PRIMEIRO verifica o HMAC.
+         *
+         * Somente depois será feita a
+         * descriptografia.
+         */
+        boolean hmacValido =
+                gerenciadorHMAC.verificarHMAC(
+                        ciphertext,
+                        hmacRecebido,
+                        sessaoSegura
+                                .getChaveHMAC()
+                                .getEncoded()
+                );
+
+        if (!hmacValido) {
+
+            System.out.println(
+                    "HMAC inválido. Mensagem descartada."
+            );
+
+            return null;
+        }
+
+        try {
+
+            return gerenciadorAES.descriptografar(
+                    ciphertext,
+                    sessaoSegura
+                            .getChaveAES()
+                            .getEncoded()
+            );
+
+        } catch (RuntimeException e) {
+
+            System.out.println(
+                    "Erro ao descriptografar mensagem: "
+                            + e.getMessage()
+            );
+
+            return null;
+        }
+    }
+
+    private void processarMensagemInterna(
+            String mensagem
+    ) {
+
+        /*
+         * REGISTER possui quatro partes:
+         *
+         * REGISTER | nome | senha | chavePublica
+         */
+        if (
+                mensagem.startsWith(
+                        "REGISTER|"
+                )
+        ) {
+
+            String[] partesCadastro =
+                    mensagem.split(
+                            "\\|",
+                            4
+                    );
+
+            processarCadastro(
+                    partesCadastro
+            );
+
+            return;
+        }
+
+        /*
+         * LOGIN_SIGNATURE possui duas partes:
+         *
+         * LOGIN_SIGNATURE | assinatura
+         */
+        if (
+                mensagem.startsWith(
+                        "LOGIN_SIGNATURE|"
+                )
+        ) {
+
+            String[] partesAssinatura =
+                    mensagem.split(
+                            "\\|",
+                            2
+                    );
+
+            processarAssinaturaLogin(
+                    partesAssinatura
+            );
+
+            return;
+        }
+
+        if (
+                mensagem.startsWith(
+                        "LOGIN_NEW_DEVICE|"
+                )
+        ) {
+
+            String[] partesNovoDispositivo =
+                    mensagem.split(
+                            "\\|",
+                            4
+                    );
+
+            processarLoginNovoDispositivo(
+                    partesNovoDispositivo
+            );
+
+            return;
+        }
+
+        String[] partes =
+                mensagem.split(
+                        "\\|",
+                        3
+                );
 
         if (partes.length == 0) {
             return;
@@ -116,10 +453,6 @@ public class ClienteHandler implements Runnable {
                 partes[0];
 
         switch (comando) {
-
-            case "REGISTER":
-                processarCadastro(partes);
-                break;
 
             case "LOGIN":
                 processarLogin(partes);
@@ -150,9 +483,134 @@ public class ClienteHandler implements Runnable {
                 break;
 
             default:
-                saida.println(
+                enviarMensagem(
                         "ERRO|Comando desconhecido"
                 );
+        }
+    }
+
+    private void processarLoginNovoDispositivo(
+            String[] partes
+    ) {
+
+        if (partes.length < 4) {
+
+            enviarMensagem(
+                    "LOGIN_ERROR|Dados inválidos"
+            );
+
+            return;
+        }
+
+        String nome =
+                partes[1].trim();
+
+        String senha =
+                partes[2];
+
+        String chavePublica =
+                partes[3].trim();
+
+        if (
+                nome.isEmpty()
+                        || senha.isEmpty()
+                        || chavePublica.isEmpty()
+        ) {
+
+            enviarMensagem(
+                    "LOGIN_ERROR|Usuário, senha ou chave pública inválidos"
+            );
+
+            return;
+        }
+
+        boolean autenticado =
+                gerenciadorUsuariosBanco
+                        .autenticar(
+                                nome,
+                                senha
+                        );
+
+        if (!autenticado) {
+
+            enviarMensagem(
+                    "LOGIN_ERROR|Usuário ou senha incorretos"
+            );
+
+            return;
+        }
+
+        if (
+                gerenciador.encontrarCliente(
+                        nome
+                ) != null
+        ) {
+
+            enviarMensagem(
+                    "LOGIN_ERROR|Usuário já está online"
+            );
+
+            return;
+        }
+
+        boolean chaveAtualizada =
+                gerenciadorUsuariosBanco
+                        .atualizarChavePublica(
+                                nome,
+                                chavePublica
+                        );
+
+        if (!chaveAtualizada) {
+
+            enviarMensagem(
+                    "LOGIN_ERROR|Não foi possível atualizar a chave pública"
+            );
+
+            return;
+        }
+
+        limparMensagensOffline(
+                nome
+        );
+
+        finalizarLogin(
+                nome
+        );
+    }
+
+    private void limparMensagensOffline(
+            String nome
+    ) {
+
+        String sql =
+                """
+                DELETE FROM mensagens
+                WHERE destinatario = ?
+                    AND entregue = 0
+                """;
+
+        try (
+                Connection conexao =
+                        ConexaoSQLite.conectar();
+
+                PreparedStatement statement =
+                        conexao.prepareStatement(sql)
+        ) {
+
+            statement.setString(
+                    1,
+                    nome
+            );
+
+            statement.executeUpdate();
+
+        } catch (SQLException e) {
+
+            System.out.println(
+                    "Erro ao limpar mensagens offline:"
+            );
+
+            e.printStackTrace();
         }
     }
 
@@ -160,9 +618,9 @@ public class ClienteHandler implements Runnable {
             String[] partes
     ) {
 
-        if (partes.length < 3) {
+        if (partes.length < 4) {
 
-            saida.println(
+            enviarMensagem(
                     "REGISTER_ERROR|Dados inválidos"
             );
 
@@ -175,38 +633,45 @@ public class ClienteHandler implements Runnable {
         String senha =
                 partes[2];
 
+        String chavePublica =
+                partes[3].trim();
+
         if (
                 nome.isEmpty()
                         || senha.isEmpty()
+                        || chavePublica.isEmpty()
         ) {
 
-            saida.println(
-                    "REGISTER_ERROR|Usuário ou senha inválidos"
+            enviarMensagem(
+                    "REGISTER_ERROR|Usuário, senha ou chave pública inválidos"
             );
 
             return;
         }
 
         boolean cadastrado =
-                gerenciadorUsuariosBanco.cadastrarUsuario(
-                        nome,
-                        senha
-                );
+                gerenciadorUsuariosBanco
+                        .cadastrarUsuario(
+                                nome,
+                                senha,
+                                chavePublica
+                        );
 
         if (cadastrado) {
 
             System.out.println(
                     "Novo usuário cadastrado: "
                             + nome
+                            + " | Chave pública armazenada."
             );
 
-            saida.println(
+            enviarMensagem(
                     "REGISTER_OK"
             );
 
         } else {
 
-            saida.println(
+            enviarMensagem(
                     "REGISTER_ERROR|Usuário já existe"
             );
         }
@@ -216,9 +681,46 @@ public class ClienteHandler implements Runnable {
             String[] partes
     ) {
 
+        /*
+         * Novo fluxo:
+         *
+         * LOGIN | nome
+         *
+         * O servidor não recebe a senha.
+         * Primeiro envia um nonce.
+         */
+        if (partes.length == 2) {
+
+            String nome =
+                    partes[1].trim();
+
+            if (nome.isEmpty()) {
+
+                enviarMensagem(
+                        "LOGIN_ERROR|Usuário inválido"
+                );
+
+                return;
+            }
+
+            iniciarDesafioLogin(
+                    nome
+            );
+
+            return;
+        }
+
+        /*
+         * Fluxo antigo mantido temporariamente
+         * durante a transição.
+         *
+         * Será removido depois que o cliente
+         * estiver utilizando exclusivamente
+         * o desafio Ed25519.
+         */
         if (partes.length < 3) {
 
-            saida.println(
+            enviarMensagem(
                     "LOGIN_ERROR|Dados inválidos"
             );
 
@@ -232,10 +734,11 @@ public class ClienteHandler implements Runnable {
                 partes[2];
 
         boolean autenticado =
-                gerenciadorUsuariosBanco.autenticar(
-                        nome,
-                        senha
-                );
+                gerenciadorUsuariosBanco
+                        .autenticar(
+                                nome,
+                                senha
+                        );
 
         if (!autenticado) {
 
@@ -244,19 +747,223 @@ public class ClienteHandler implements Runnable {
                             + nome
             );
 
-            saida.println(
+            enviarMensagem(
                     "LOGIN_ERROR|Usuário ou senha incorretos"
             );
 
             return;
         }
 
+        finalizarLogin(
+                nome
+        );
+    }
+
+    private void iniciarDesafioLogin(
+            String nome
+    ) {
+
+        /*
+         * O usuário precisa existir e possuir
+         * uma chave pública cadastrada.
+         */
+        String chavePublica =
+                gerenciadorUsuariosBanco
+                        .obterChavePublica(
+                                nome
+                        );
+
+        if (
+                chavePublica == null
+                        || chavePublica.trim().isEmpty()
+        ) {
+
+            enviarMensagem(
+                    "LOGIN_ERROR|Usuário não possui chave pública cadastrada"
+            );
+
+            return;
+        }
+
+        /*
+         * Gera nonce criptograficamente aleatório.
+         */
+        byte[] nonceBytes =
+                new byte[32];
+
+        SecureRandom random =
+                new SecureRandom();
+
+        random.nextBytes(
+                nonceBytes
+        );
+
+        nonceLogin =
+                Base64
+                        .getEncoder()
+                        .encodeToString(
+                                nonceBytes
+                        );
+
+        usuarioLoginPendente =
+                nome;
+
+        System.out.println(
+                "Desafio de login enviado para: "
+                        + nome
+        );
+
+        enviarMensagem(
+                "LOGIN_CHALLENGE|"
+                        + nonceLogin
+        );
+    }
+
+    private void processarAssinaturaLogin(
+            String[] partes
+    ) {
+
+        if (partes.length < 2) {
+
+            enviarMensagem(
+                    "LOGIN_ERROR|Assinatura não enviada"
+            );
+
+            limparDesafioLogin();
+
+            return;
+        }
+
+        if (
+                usuarioLoginPendente == null
+                        || nonceLogin == null
+        ) {
+
+            enviarMensagem(
+                    "LOGIN_ERROR|Nenhum desafio de login pendente"
+            );
+
+            return;
+        }
+
+        String assinatura =
+                partes[1].trim();
+
+        if (assinatura.isEmpty()) {
+
+            enviarMensagem(
+                    "LOGIN_ERROR|Assinatura inválida"
+            );
+
+            limparDesafioLogin();
+
+            return;
+        }
+
+        String chavePublicaBase64 =
+                gerenciadorUsuariosBanco
+                        .obterChavePublica(
+                                usuarioLoginPendente
+                        );
+
+        if (
+                chavePublicaBase64 == null
+                        || chavePublicaBase64.trim().isEmpty()
+        ) {
+
+            enviarMensagem(
+                    "LOGIN_ERROR|Chave pública não encontrada"
+            );
+
+            limparDesafioLogin();
+
+            return;
+        }
+
+        try {
+
+            var chavePublica =
+                    gerenciadorAssinatura
+                            .base64ParaChavePublica(
+                                    chavePublicaBase64
+                            );
+
+            boolean assinaturaValida =
+                    gerenciadorAssinatura.verificar(
+                            nonceLogin,
+                            assinatura,
+                            chavePublica
+                    );
+
+            if (!assinaturaValida) {
+
+                System.out.println(
+                        "Assinatura de login inválida: "
+                                + usuarioLoginPendente
+                );
+
+                enviarMensagem(
+                        "LOGIN_ERROR|Autenticação por assinatura recusada"
+                );
+
+                limparDesafioLogin();
+
+                return;
+            }
+
+            String usuarioAutenticado =
+                    usuarioLoginPendente;
+
+            /*
+             * O desafio não pode ser reutilizado.
+             */
+            limparDesafioLogin();
+
+            System.out.println(
+                    "Assinatura de login válida: "
+                            + usuarioAutenticado
+            );
+
+            finalizarLogin(
+                    usuarioAutenticado
+            );
+
+        } catch (RuntimeException e) {
+
+            System.out.println(
+                    "Erro ao verificar assinatura de login: "
+                            + e.getMessage()
+            );
+
+            enviarMensagem(
+                    "LOGIN_ERROR|Não foi possível verificar a assinatura"
+            );
+
+            limparDesafioLogin();
+        }
+    }
+
+    private void limparDesafioLogin() {
+
+        usuarioLoginPendente =
+                null;
+
+        nonceLogin =
+                null;
+    }
+
+    private void finalizarLogin(
+            String nome
+    ) {
+
         ClienteHandler usuarioConectado =
-                gerenciador.encontrarCliente(nome);
+                gerenciador.encontrarCliente(
+                        nome
+                );
 
         if (usuarioConectado != null) {
 
-            saida.println(
+            enviarMensagem(
                     "LOGIN_ERROR|Usuário já está online"
             );
 
@@ -275,15 +982,11 @@ public class ClienteHandler implements Runnable {
                 this
         );
 
-        saida.println(
+        enviarMensagem(
                 "LOGIN_OK|"
                         + nomeUsuario
         );
 
-        /*
-         * Envia todos os usuários cadastrados
-         * no banco de dados.
-         */
         List<String> usuariosCadastrados =
                 gerenciadorUsuariosBanco
                         .listarUsuarios();
@@ -299,37 +1002,19 @@ public class ClienteHandler implements Runnable {
                         + listaUsuarios
         );
 
-        /*
-         * Envia para o cliente que acabou de
-         * entrar a lista de usuários que já
-         * estavam online.
-         *
-         * Isso permite que o cliente saiba
-         * corretamente quem está online mesmo
-         * antes de receber novos eventos ONLINE.
-         */
         String usuariosOnline =
                 gerenciador.obterUsuariosOnline();
 
-        saida.println(
+        enviarMensagem(
                 "ONLINE_USERS|"
                         + usuariosOnline
         );
 
-        /*
-         * Continua avisando todos os clientes
-         * que este usuário acabou de ficar online.
-         */
         gerenciador.enviarParaTodos(
                 "ONLINE|"
                         + nomeUsuario
         );
 
-        /*
-         * Depois que o login foi concluído,
-         * procura mensagens que chegaram
-         * enquanto este usuário estava offline.
-         */
         entregarMensagensPendentes();
     }
 
@@ -358,7 +1043,9 @@ public class ClienteHandler implements Runnable {
                         ConexaoSQLite.conectar();
 
                 PreparedStatement statement =
-                        conexao.prepareStatement(sql)
+                        conexao.prepareStatement(
+                                sql
+                        )
         ) {
 
             statement.setString(
@@ -396,7 +1083,7 @@ public class ClienteHandler implements Runnable {
                                     + "|"
                                     + conteudo;
 
-                    saida.println(
+                    enviarMensagem(
                             mensagem
                     );
 
@@ -445,7 +1132,9 @@ public class ClienteHandler implements Runnable {
                         ConexaoSQLite.conectar();
 
                 PreparedStatement statement =
-                        conexao.prepareStatement(sql)
+                        conexao.prepareStatement(
+                                sql
+                        )
         ) {
 
             statement.setInt(
@@ -476,7 +1165,7 @@ public class ClienteHandler implements Runnable {
 
         if (partes.length < 3) {
 
-            saida.println(
+            enviarMensagem(
                     "ERRO|Mensagem inválida"
             );
 
@@ -491,7 +1180,7 @@ public class ClienteHandler implements Runnable {
 
         if (nomeUsuario == null) {
 
-            saida.println(
+            enviarMensagem(
                     "ERRO|Usuário não autenticado"
             );
 
@@ -503,7 +1192,7 @@ public class ClienteHandler implements Runnable {
                         || destinatario.trim().isEmpty()
         ) {
 
-            saida.println(
+            enviarMensagem(
                     "ERRO|Destinatário inválido"
             );
 
@@ -515,7 +1204,7 @@ public class ClienteHandler implements Runnable {
                         || conteudo.trim().isEmpty()
         ) {
 
-            saida.println(
+            enviarMensagem(
                     "ERRO|Mensagem vazia"
             );
 
@@ -531,7 +1220,7 @@ public class ClienteHandler implements Runnable {
 
         if (idMensagem <= 0) {
 
-            saida.println(
+            enviarMensagem(
                     "ERRO|Não foi possível salvar a mensagem"
             );
 
@@ -563,7 +1252,7 @@ public class ClienteHandler implements Runnable {
             );
         }
 
-        saida.println(
+        enviarMensagem(
                 mensagemTempoReal
         );
     }
@@ -587,7 +1276,9 @@ public class ClienteHandler implements Runnable {
                         ConexaoSQLite.conectar();
 
                 PreparedStatement statement =
-                        conexao.prepareStatement(sql)
+                        conexao.prepareStatement(
+                                sql
+                        )
         ) {
 
             statement.setInt(
@@ -700,7 +1391,7 @@ public class ClienteHandler implements Runnable {
 
         if (partes.length < 2) {
 
-            saida.println(
+            enviarMensagem(
                     "ERRO|Histórico inválido"
             );
 
@@ -709,7 +1400,7 @@ public class ClienteHandler implements Runnable {
 
         if (nomeUsuario == null) {
 
-            saida.println(
+            enviarMensagem(
                     "ERRO|Usuário não autenticado"
             );
 
@@ -721,7 +1412,7 @@ public class ClienteHandler implements Runnable {
 
         if (outroUsuario.isEmpty()) {
 
-            saida.println(
+            enviarMensagem(
                     "ERRO|Usuário inválido"
             );
 
@@ -757,7 +1448,9 @@ public class ClienteHandler implements Runnable {
                         ConexaoSQLite.conectar();
 
                 PreparedStatement statement =
-                        conexao.prepareStatement(sql)
+                        conexao.prepareStatement(
+                                sql
+                        )
         ) {
 
             statement.setString(
@@ -788,7 +1481,9 @@ public class ClienteHandler implements Runnable {
                 while (resultado.next()) {
 
                     int id =
-                            resultado.getInt("id");
+                            resultado.getInt(
+                                    "id"
+                            );
 
                     String remetente =
                             resultado.getString(
@@ -810,7 +1505,7 @@ public class ClienteHandler implements Runnable {
                                     "data_hora"
                             );
 
-                    saida.println(
+                    enviarMensagem(
                             "HISTORY_MESSAGE|"
                                     + id
                                     + "|"
@@ -824,7 +1519,7 @@ public class ClienteHandler implements Runnable {
                     );
                 }
 
-                saida.println(
+                enviarMensagem(
                         "HISTORY_END"
                 );
 
@@ -844,7 +1539,7 @@ public class ClienteHandler implements Runnable {
 
             e.printStackTrace();
 
-            saida.println(
+            enviarMensagem(
                     "ERRO|Não foi possível carregar o histórico"
             );
         }
@@ -856,7 +1551,7 @@ public class ClienteHandler implements Runnable {
 
         if (partes.length < 2) {
 
-            saida.println(
+            enviarMensagem(
                     "DELETE_ERROR|ID inválido"
             );
 
@@ -865,7 +1560,7 @@ public class ClienteHandler implements Runnable {
 
         if (nomeUsuario == null) {
 
-            saida.println(
+            enviarMensagem(
                     "DELETE_ERROR|Usuário não autenticado"
             );
 
@@ -883,7 +1578,7 @@ public class ClienteHandler implements Runnable {
 
         } catch (NumberFormatException e) {
 
-            saida.println(
+            enviarMensagem(
                     "DELETE_ERROR|ID inválido"
             );
 
@@ -892,7 +1587,7 @@ public class ClienteHandler implements Runnable {
 
         if (id <= 0) {
 
-            saida.println(
+            enviarMensagem(
                     "DELETE_ERROR|ID inválido"
             );
 
@@ -928,7 +1623,9 @@ public class ClienteHandler implements Runnable {
                         ConexaoSQLite.conectar();
 
                 PreparedStatement statement =
-                        conexao.prepareStatement(sql)
+                        conexao.prepareStatement(
+                                sql
+                        )
         ) {
 
             statement.setString(
@@ -968,7 +1665,7 @@ public class ClienteHandler implements Runnable {
                                 + nomeUsuario
                 );
 
-                saida.println(
+                enviarMensagem(
                         "DELETE_OK|"
                                 + id
                 );
@@ -982,7 +1679,7 @@ public class ClienteHandler implements Runnable {
                                 + nomeUsuario
                 );
 
-                saida.println(
+                enviarMensagem(
                         "DELETE_ERROR|Mensagem não encontrada ou sem permissão"
                 );
             }
@@ -995,7 +1692,7 @@ public class ClienteHandler implements Runnable {
 
             e.printStackTrace();
 
-            saida.println(
+            enviarMensagem(
                     "DELETE_ERROR|Não foi possível apagar a mensagem"
             );
         }
@@ -1006,12 +1703,10 @@ public class ClienteHandler implements Runnable {
     ) {
 
         if (partes.length < 2) {
-
             return;
         }
 
         if (nomeUsuario == null) {
-
             return;
         }
 
@@ -1019,7 +1714,6 @@ public class ClienteHandler implements Runnable {
                 partes[1].trim();
 
         if (remetente.isEmpty()) {
-
             return;
         }
 
@@ -1088,7 +1782,9 @@ public class ClienteHandler implements Runnable {
                 while (resultado.next()) {
 
                     int id =
-                            resultado.getInt("id");
+                            resultado.getInt(
+                                    "id"
+                            );
 
                     atualizar.setInt(
                             1,
@@ -1202,9 +1898,38 @@ public class ClienteHandler implements Runnable {
             String mensagem
     ) {
 
-        if (saida != null) {
-            saida.println(mensagem);
+        if (
+                saida == null
+                        || sessaoSegura == null
+        ) {
+
+            return;
         }
+
+        String ciphertext =
+                gerenciadorAES.criptografar(
+                        mensagem,
+                        sessaoSegura
+                                .getChaveAES()
+                                .getEncoded()
+                );
+
+        String hmac =
+                gerenciadorHMAC.gerarHMAC(
+                        ciphertext,
+                        sessaoSegura
+                                .getChaveHMAC()
+                                .getEncoded()
+                );
+
+        saida.println(
+                "SECURE|"
+                        + ciphertext
+                        + "|"
+                        + hmac
+        );
+
+        sessaoSegura.registrarMensagem();
     }
 
     public String getNomeUsuario() {

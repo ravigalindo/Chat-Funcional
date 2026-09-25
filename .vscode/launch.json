@@ -3,6 +3,62 @@
     "configurations": [
         {
             "type": "java",
+            "name": "TesteAssinatura",
+            "request": "launch",
+            "mainClass": "ChatCliente.Seguranca.TesteAssinatura",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
+            "name": "ChatCliente",
+            "request": "launch",
+            "mainClass": "ChatCliente.ChatCliente",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
+            "name": "TesteHandshakeCompleto",
+            "request": "launch",
+            "mainClass": "ChatCliente.Seguranca.TesteHandshakeCompleto",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
+            "name": "TesteHandshakeCliente",
+            "request": "launch",
+            "mainClass": "ChatCliente.Seguranca.TesteHandshakeCliente",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
+            "name": "TesteSessaoSegura",
+            "request": "launch",
+            "mainClass": "ChatCliente.Seguranca.TesteSessaoSegura",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
+            "name": "TesteDHHKDF",
+            "request": "launch",
+            "mainClass": "ChatCliente.Seguranca.TesteDHHKDF",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
+            "name": "TesteDH",
+            "request": "launch",
+            "mainClass": "ChatCliente.Seguranca.TesteDH",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
+            "name": "TesteHKDF",
+            "request": "launch",
+            "mainClass": "ChatCliente.Seguranca.TesteHKDF",
+            "projectName": "Chat-Funcional_2789bad7"
+        },
+        {
+            "type": "java",
             "name": "TesteHMAC",
             "request": "launch",
             "mainClass": "ChatCliente.Seguranca.TesteHMAC",

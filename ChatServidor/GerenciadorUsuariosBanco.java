@@ -19,12 +19,19 @@ public class GerenciadorUsuariosBanco {
             String senha
     ) {
 
-        /*
-         * A senha nunca é armazenada diretamente.
-         *
-         * O Password4j gera o hash Argon2
-         * utilizando um salt aleatório.
-         */
+        return cadastrarUsuario(
+                nome,
+                senha,
+                null
+        );
+    }
+
+    public boolean cadastrarUsuario(
+            String nome,
+            String senha,
+            String chavePublica
+    ) {
+
         String senhaHash =
                 gerenciadorSenhas.gerarHash(
                         senha
@@ -35,9 +42,10 @@ public class GerenciadorUsuariosBanco {
                 INSERT INTO usuarios (
                     nome,
                     senha,
-                    senha_hash
+                    senha_hash,
+                    chave_publica
                 )
-                VALUES (?, NULL, ?)
+                VALUES (?, NULL, ?, ?)
                 """;
 
         try (
@@ -56,6 +64,11 @@ public class GerenciadorUsuariosBanco {
             statement.setString(
                     2,
                     senhaHash
+            );
+
+            statement.setString(
+                    3,
+                    chavePublica
             );
 
             statement.executeUpdate();
@@ -86,132 +99,214 @@ public class GerenciadorUsuariosBanco {
     }
 
     public boolean autenticar(
-        String nome,
-        String senha
-) {
-
-    String sql =
-            """
-            SELECT id, senha, senha_hash
-            FROM usuarios
-            WHERE nome = ?
-            """;
-
-    try (
-            Connection conexao =
-                    ConexaoSQLite.conectar();
-
-            PreparedStatement statement =
-                    conexao.prepareStatement(sql)
+            String nome,
+            String senha
     ) {
 
-        statement.setString(
-                1,
-                nome
-        );
+        String sql =
+                """
+                SELECT id, senha, senha_hash
+                FROM usuarios
+                WHERE nome = ?
+                """;
 
         try (
-                ResultSet resultado =
-                        statement.executeQuery()
+                Connection conexao =
+                        ConexaoSQLite.conectar();
+
+                PreparedStatement statement =
+                        conexao.prepareStatement(sql)
         ) {
 
-            if (!resultado.next()) {
-                return false;
-            }
+            statement.setString(
+                    1,
+                    nome
+            );
 
-            int id =
-                    resultado.getInt("id");
+            try (
+                    ResultSet resultado =
+                            statement.executeQuery()
+            ) {
 
-            String senhaAntiga =
-                    resultado.getString("senha");
-
-            String senhaHash =
-                    resultado.getString("senha_hash");
-
-            /*
-             * Usuário que já possui hash Argon2.
-             */
-            if (senhaHash != null) {
-
-                return gerenciadorSenhas.verificarSenha(
-                        senha,
-                        senhaHash
-                );
-            }
-
-            /*
-             * Usuário antigo que ainda não foi migrado.
-             */
-            if (senhaAntiga != null) {
-
-                boolean senhaCorreta =
-                        senhaAntiga.equals(senha);
-
-                if (!senhaCorreta) {
+                if (!resultado.next()) {
                     return false;
                 }
 
-                /*
-                 * A senha antiga está correta.
-                 *
-                 * Agora geramos o hash Argon2 e
-                 * removemos a senha em texto.
-                 */
-                String novoHash =
-                        gerenciadorSenhas.gerarHash(
-                                senha
-                        );
+                int id =
+                        resultado.getInt("id");
 
-                String sqlAtualizar =
-                        """
-                        UPDATE usuarios
-                        SET senha = NULL,
-                            senha_hash = ?
-                        WHERE id = ?
-                        """;
+                String senhaAntiga =
+                        resultado.getString("senha");
 
-                try (
-                        PreparedStatement atualizar =
-                                conexao.prepareStatement(
-                                        sqlAtualizar
-                                )
-                ) {
+                String senhaHash =
+                        resultado.getString("senha_hash");
 
-                    atualizar.setString(
-                            1,
-                            novoHash
+                if (senhaHash != null) {
+
+                    return gerenciadorSenhas.verificarSenha(
+                            senha,
+                            senhaHash
                     );
-
-                    atualizar.setInt(
-                            2,
-                            id
-                    );
-
-                    atualizar.executeUpdate();
                 }
 
-                System.out.println(
-                        "Usuário migrado para Argon2: "
-                                + nome
-                );
+                if (senhaAntiga != null) {
 
-                return true;
+                    boolean senhaCorreta =
+                            senhaAntiga.equals(senha);
+
+                    if (!senhaCorreta) {
+                        return false;
+                    }
+
+                    String novoHash =
+                            gerenciadorSenhas.gerarHash(
+                                    senha
+                            );
+
+                    String sqlAtualizar =
+                            """
+                            UPDATE usuarios
+                            SET senha = NULL,
+                                senha_hash = ?
+                            WHERE id = ?
+                            """;
+
+                    try (
+                            PreparedStatement atualizar =
+                                    conexao.prepareStatement(
+                                            sqlAtualizar
+                                    )
+                    ) {
+
+                        atualizar.setString(
+                                1,
+                                novoHash
+                        );
+
+                        atualizar.setInt(
+                                2,
+                                id
+                        );
+
+                        atualizar.executeUpdate();
+                    }
+
+                    System.out.println(
+                            "Usuário migrado para Argon2: "
+                                    + nome
+                    );
+
+                    return true;
+                }
+
+                return false;
             }
+
+        } catch (SQLException e) {
+
+            System.out.println(
+                    "Erro ao autenticar usuário:"
+            );
+
+            e.printStackTrace();
 
             return false;
         }
-
-    } catch (SQLException e) {
-
-        System.out.println(
-                "Erro ao autenticar usuário:"
-        );
-
-        e.printStackTrace();
-
-        return false;
     }
-}
+
+    public String obterChavePublica(
+            String nome
+    ) {
+
+        String sql =
+                """
+                SELECT chave_publica
+                FROM usuarios
+                WHERE nome = ?
+                """;
+
+        try (
+                Connection conexao =
+                        ConexaoSQLite.conectar();
+
+                PreparedStatement statement =
+                        conexao.prepareStatement(sql)
+        ) {
+
+            statement.setString(
+                    1,
+                    nome
+            );
+
+            try (
+                    ResultSet resultado =
+                            statement.executeQuery()
+            ) {
+
+                if (!resultado.next()) {
+                    return null;
+                }
+
+                return resultado.getString(
+                        "chave_publica"
+                );
+            }
+
+        } catch (SQLException e) {
+
+            System.out.println(
+                    "Erro ao obter chave pública:"
+            );
+
+            e.printStackTrace();
+
+            return null;
+        }
+    }
+
+    public boolean atualizarChavePublica(
+            String nome,
+            String chavePublica
+    ) {
+
+        String sql =
+                """
+                UPDATE usuarios
+                SET chave_publica = ?
+                WHERE nome = ?
+                """;
+
+        try (
+                Connection conexao =
+                        ConexaoSQLite.conectar();
+
+                PreparedStatement statement =
+                        conexao.prepareStatement(sql)
+        ) {
+
+            statement.setString(
+                    1,
+                    chavePublica
+            );
+
+            statement.setString(
+                    2,
+                    nome
+            );
+
+            return statement.executeUpdate() == 1;
+
+        } catch (SQLException e) {
+
+            System.out.println(
+                    "Erro ao atualizar chave pública:"
+            );
+
+            e.printStackTrace();
+
+            return false;
+        }
+    }
 
     public boolean usuarioExiste(
             String nome
@@ -253,10 +348,6 @@ public class GerenciadorUsuariosBanco {
         }
     }
 
-    /*
-     * Retorna todos os usuários cadastrados
-     * no banco de dados.
-     */
     public List<String> listarUsuarios() {
 
         List<String> usuarios =
@@ -297,65 +388,5 @@ public class GerenciadorUsuariosBanco {
         }
 
         return usuarios;
-    }
-
-    public static void main(String[] args) {
-
-        GerenciadorUsuariosBanco gerenciador =
-                new GerenciadorUsuariosBanco();
-
-        String nomeTeste =
-                "teste_argon2";
-
-        String senhaTeste =
-                "123456";
-
-        boolean cadastrado =
-                gerenciador.cadastrarUsuario(
-                        nomeTeste,
-                        senhaTeste
-                );
-
-        System.out.println(
-                "Cadastro realizado: "
-                        + cadastrado
-        );
-
-        boolean autenticado =
-                gerenciador.autenticar(
-                        nomeTeste,
-                        senhaTeste
-                );
-
-        System.out.println(
-                "Autenticação correta: "
-                        + autenticado
-        );
-
-        boolean senhaErrada =
-                gerenciador.autenticar(
-                        nomeTeste,
-                        "senhaerrada"
-                );
-
-        System.out.println(
-                "Autenticação com senha errada: "
-                        + senhaErrada
-        );
-
-        System.out.println(
-                "\nUsuários cadastrados:"
-        );
-
-        List<String> usuarios =
-                gerenciador.listarUsuarios();
-
-        for (String usuario :
-                usuarios) {
-
-            System.out.println(
-                    "- " + usuario
-            );
-        }
     }
 }

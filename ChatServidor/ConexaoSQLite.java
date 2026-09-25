@@ -34,7 +34,8 @@ public class ConexaoSQLite {
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     nome TEXT NOT NULL UNIQUE,
                     senha TEXT,
-                    senha_hash TEXT
+                    senha_hash TEXT,
+                    chave_publica TEXT
                 )
                 """;
 
@@ -61,21 +62,10 @@ public class ConexaoSQLite {
                         conexao.createStatement()
         ) {
 
-            /*
-             * Cria as tabelas caso ainda não existam.
-             */
             statement.execute(sqlUsuarios);
             statement.execute(sqlMensagens);
 
-            /*
-             * Verifica a estrutura atual da tabela usuarios.
-             */
             migrarTabelaUsuarios(statement);
-
-            /*
-             * Verifica se as colunas entregue e lida
-             * existem na tabela mensagens.
-             */
             migrarTabelaMensagens(statement);
 
             System.out.println(
@@ -98,6 +88,7 @@ public class ConexaoSQLite {
 
         boolean colunaSenhaExiste = false;
         boolean colunaSenhaHashExiste = false;
+        boolean colunaChavePublicaExiste = false;
 
         try (
                 var resultado =
@@ -124,13 +115,16 @@ public class ConexaoSQLite {
 
                     colunaSenhaHashExiste = true;
                 }
+
+                if ("chave_publica".equalsIgnoreCase(
+                        nomeColuna
+                )) {
+
+                    colunaChavePublicaExiste = true;
+                }
             }
         }
 
-        /*
-         * Se senha_hash ainda não existir,
-         * adiciona a coluna.
-         */
         if (!colunaSenhaHashExiste) {
 
             statement.executeUpdate(
@@ -145,19 +139,26 @@ public class ConexaoSQLite {
             );
         }
 
-        /*
-         * A tabela antiga possui:
-         *
-         * senha TEXT NOT NULL
-         *
-         * SQLite não permite simplesmente alterar
-         * essa coluna para aceitar NULL.
-         *
-         * Portanto, fazemos uma migração completa
-         * somente se a coluna senha ainda estiver
-         * configurada como NOT NULL.
-         */
-        if (colunaSenhaExiste && colunaSenhaEhObrigatoria(statement)) {
+        if (!colunaChavePublicaExiste) {
+
+            statement.executeUpdate(
+                    """
+                    ALTER TABLE usuarios
+                    ADD COLUMN chave_publica TEXT
+                    """
+            );
+
+            System.out.println(
+                    "Coluna 'chave_publica' adicionada à tabela usuarios."
+            );
+        }
+
+        if (
+                colunaSenhaExiste
+                        && colunaSenhaEhObrigatoria(
+                                statement
+                        )
+        ) {
 
             System.out.println(
                     "Migrando estrutura da tabela usuarios..."
@@ -169,7 +170,8 @@ public class ConexaoSQLite {
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         nome TEXT NOT NULL UNIQUE,
                         senha TEXT,
-                        senha_hash TEXT
+                        senha_hash TEXT,
+                        chave_publica TEXT
                     )
                     """
             );
@@ -180,13 +182,15 @@ public class ConexaoSQLite {
                         id,
                         nome,
                         senha,
-                        senha_hash
+                        senha_hash,
+                        chave_publica
                     )
                     SELECT
                         id,
                         nome,
                         senha,
-                        senha_hash
+                        senha_hash,
+                        chave_publica
                     FROM usuarios
                     """
             );
