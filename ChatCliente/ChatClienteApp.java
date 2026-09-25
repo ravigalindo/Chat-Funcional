@@ -111,6 +111,34 @@ public class ChatClienteApp
             String mensagem
     ) {
 
+        if (mensagem.startsWith("E2EE_ERROR|")) {
+
+            String erro =
+                    mensagem.substring(
+                            "E2EE_ERROR|".length()
+                    );
+
+            System.out.println(
+                    "Mensagem não enviada: "
+                            + erro
+            );
+
+            Platform.runLater(() -> {
+
+                if (indicadorDigitacao != null) {
+                    indicadorDigitacao.setText(
+                            "Mensagem não enviada: "
+                                    + erro
+                    );
+                    indicadorDigitacao.setStyle(
+                            "-fx-text-fill: #b00020;"
+                    );
+                }
+            });
+
+            return;
+        }
+
         /*
          * Novo formato:
          *
@@ -184,15 +212,11 @@ public class ChatClienteApp
                             enviadaPorMim
                     );
 
-            historicoConversas
-                    .computeIfAbsent(
-                            contatoMensagem,
-                            chave ->
-                                    new ArrayList<>()
-                    )
-                    .add(
-                            novaMensagem
-                    );
+            obterOuCriarHistoricoContato(
+                    contatoMensagem
+            ).add(
+                    novaMensagem
+            );
 
             salvarHistoricoLocal();
 
@@ -403,15 +427,26 @@ public class ChatClienteApp
                             enviadaPorMim
                     );
 
-            historicoConversas
-                    .computeIfAbsent(
-                            contato,
-                            chave ->
-                                    new ArrayList<>()
-                    )
-                    .add(
-                            mensagemHistorico
+            List<Mensagem> mensagensContato =
+                    obterOuCriarHistoricoContato(
+                            contato
                     );
+
+            boolean mensagemJaExiste =
+                    mensagensContato
+                            .stream()
+                            .anyMatch(
+                                    mensagemExistente ->
+                                            mensagemExistente.getId() == id
+                            );
+
+            if (mensagemJaExiste) {
+                return;
+            }
+
+            mensagensContato.add(
+                    mensagemHistorico
+            );
 
             salvarHistoricoLocal();
 
@@ -684,6 +719,10 @@ public class ChatClienteApp
                             nomeUsuario
                                     + " está digitando..."
                     );
+                    indicadorDigitacao.setStyle(
+                            "-fx-text-fill: #666666;"
+                                    + "-fx-font-style: italic;"
+                    );
                 }
             });
 
@@ -721,6 +760,10 @@ public class ChatClienteApp
 
                     indicadorDigitacao.setText(
                             ""
+                    );
+                    indicadorDigitacao.setStyle(
+                            "-fx-text-fill: #666666;"
+                                    + "-fx-font-style: italic;"
                     );
                 }
             });
@@ -776,6 +819,10 @@ public class ChatClienteApp
                 new Insets(15)
         );
 
+        mensagens.setStyle(
+                "-fx-background-color: #f4f7fb;"
+        );
+
         ScrollPane scrollMensagens =
                 new ScrollPane(
                         mensagens
@@ -787,6 +834,14 @@ public class ChatClienteApp
 
         TextField campoMensagem =
                 new TextField();
+
+        campoMensagem.setStyle(
+                "-fx-background-color: white;"
+                        + "-fx-border-color: #d7dee8;"
+                        + "-fx-border-radius: 6;"
+                        + "-fx-background-radius: 6;"
+                        + "-fx-padding: 10;"
+        );
 
         campoMensagem.setPromptText(
                 "Digite uma mensagem..."
@@ -807,6 +862,13 @@ public class ChatClienteApp
 
         Button botaoEnviar =
                 new Button("Enviar");
+
+        botaoEnviar.setStyle(
+                "-fx-background-color: #176b87;"
+                        + "-fx-text-fill: white;"
+                        + "-fx-font-weight: bold;"
+                        + "-fx-padding: 10 18;"
+        );
 
         botaoEnviar.setOnAction(event -> {
 
@@ -846,6 +908,11 @@ public class ChatClienteApp
                             .getSelectedItem();
 
             if (contatoSelecionado != null) {
+
+                                if (timerDigitacao != null) {
+                                        timerDigitacao.cancel();
+                                        timerDigitacao = null;
+                                }
 
                 contatoAtual =
                         removerStatus(
@@ -901,6 +968,22 @@ public class ChatClienteApp
                 200
         );
 
+        painelContatos.setStyle(
+                "-fx-background-color: white;"
+                        + "-fx-border-color: #d7dee8;"
+                        + "-fx-border-width: 0 1px 0 0;"
+        );
+
+        tituloContatos.setStyle(
+                "-fx-text-fill: #17324d;"
+                        + "-fx-font-size: 16px;"
+                        + "-fx-font-weight: bold;"
+        );
+
+        listaContatos.setStyle(
+                "-fx-background-color: white;"
+        );
+
         VBox cabecalhoConversa =
                 new VBox(
                         3,
@@ -910,6 +993,10 @@ public class ChatClienteApp
 
         BorderPane painelConversa =
                 new BorderPane();
+
+        painelConversa.setStyle(
+                "-fx-background-color: #f4f7fb;"
+        );
 
         painelConversa.setTop(
                 cabecalhoConversa
@@ -928,10 +1015,26 @@ public class ChatClienteApp
                 new Insets(15)
         );
 
+        Button botaoSair =
+                new Button("Sair");
+
+        botaoSair.setStyle(
+                "-fx-background-color: #dceaf0;"
+                        + "-fx-text-fill: white;"
+                        + "-fx-font-weight: bold;"
+        );
+
+        botaoSair.setOnAction(event -> {
+            encerrarSessao(
+                    stage
+            );
+        });
+
         HBox topo =
                 new HBox(
                         10,
-                        usuarioLogadoLabel
+                        usuarioLogadoLabel,
+                        botaoSair
                 );
 
         topo.setAlignment(
@@ -940,6 +1043,15 @@ public class ChatClienteApp
 
         topo.setPadding(
                 new Insets(10)
+        );
+
+        topo.setStyle(
+                "-fx-background-color: #17324d;"
+        );
+
+        usuarioLogadoLabel.setStyle(
+                "-fx-text-fill: white;"
+                        + "-fx-font-weight: bold;"
         );
 
         BorderPane layoutPrincipal =
@@ -964,6 +1076,12 @@ public class ChatClienteApp
                         600
                 );
 
+        scene.setFill(
+                javafx.scene.paint.Color.web(
+                        "#f4f7fb"
+                )
+        );
+
         stage.setTitle(
                 "Chat - Segurança da Informação"
         );
@@ -979,6 +1097,39 @@ public class ChatClienteApp
          */
         atualizarListaContatosVisual();
     }
+
+        private void encerrarSessao(
+                        Stage stage
+        ) {
+
+                if (timerDigitacao != null) {
+                        timerDigitacao.cancel();
+                        timerDigitacao = null;
+                }
+
+                clienteTCP.desconectar();
+                sessao.encerrarSessao();
+
+                historicoConversas.clear();
+                mensagensNaoLidas.clear();
+                usuariosCadastrados.clear();
+                usuariosOnline.clear();
+                contatoAtual = null;
+                mensagens = null;
+                listaContatos = null;
+                indicadorDigitacao = null;
+                persistenciaHistorico = null;
+
+                LoginView loginView =
+                                new LoginView(
+                                                stage,
+                                                this,
+                                                sessao,
+                                                clienteTCP
+                                );
+
+                loginView.mostrar();
+        }
 
     /*
      * Atualiza a lista de usuários cadastrados.
@@ -1441,7 +1592,10 @@ public class ChatClienteApp
         }
 
         timerDigitacao =
-                new Timer();
+                new Timer(true);
+
+        String destinatario =
+                contatoAtual;
 
         timerDigitacao.schedule(
                 new TimerTask() {
@@ -1449,11 +1603,11 @@ public class ChatClienteApp
                     @Override
                     public void run() {
 
-                        if (contatoAtual != null) {
+                        if (destinatario != null) {
 
                             clienteTCP
                                     .enviarParadaDigitacao(
-                                            contatoAtual
+                                            destinatario
                                     );
                         }
                     }
@@ -1895,13 +2049,71 @@ public class ChatClienteApp
             return;
         }
 
-        historicoConversas.remove(
-                contatoAtual
-        );
+        List<Mensagem> mensagensLocais =
+                obterHistoricoContato(
+                        contatoAtual
+                );
+
+        if (
+                mensagensLocais != null
+                        && !mensagensLocais.isEmpty()
+        ) {
+
+            for (Mensagem mensagem : mensagensLocais) {
+                adicionarMensagemNaTela(
+                        mensagem
+                );
+            }
+
+            return;
+        }
 
         clienteTCP.solicitarHistorico(
                 contatoAtual
         );
+    }
+
+    private List<Mensagem> obterHistoricoContato(
+            String contato
+    ) {
+
+        if (contato == null) {
+            return null;
+        }
+
+        for (Map.Entry<String, List<Mensagem>> entrada :
+                historicoConversas.entrySet()) {
+
+            if (entrada.getKey().equalsIgnoreCase(contato)) {
+                return entrada.getValue();
+            }
+        }
+
+        return null;
+    }
+
+    private List<Mensagem> obterOuCriarHistoricoContato(
+            String contato
+    ) {
+
+        List<Mensagem> existente =
+                obterHistoricoContato(
+                        contato
+                );
+
+        if (existente != null) {
+            return existente;
+        }
+
+        List<Mensagem> novoHistorico =
+                new ArrayList<>();
+
+        historicoConversas.put(
+                contato,
+                novoHistorico
+        );
+
+        return novoHistorico;
     }
 
     private String removerStatus(

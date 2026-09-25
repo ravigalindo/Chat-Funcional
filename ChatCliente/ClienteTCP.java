@@ -747,6 +747,10 @@ public class ClienteTCP {
             String mensagem
     ) {
 
+                if (mensagem.startsWith("E2EE_ERROR|")) {
+                        return false;
+                }
+
         if (mensagem.startsWith("PUBLIC_KEY|")) {
 
             String[] partes =

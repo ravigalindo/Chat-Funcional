@@ -1492,6 +1492,17 @@ public class ClienteHandler implements Runnable {
                     idMensagem,
                     destinatario
             );
+
+        } else {
+
+            System.out.println(
+                    "Mensagem offline armazenada: ID="
+                            + idMensagem
+                            + " | "
+                            + nomeUsuario
+                            + " -> "
+                            + destinatario
+            );
         }
 
         enviarMensagem(

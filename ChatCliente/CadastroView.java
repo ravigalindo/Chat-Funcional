@@ -31,6 +31,12 @@ public class CadastroView {
         Label titulo =
                 new Label("CRIAR CONTA");
 
+        titulo.setStyle(
+                "-fx-text-fill: #17324d;"
+                        + "-fx-font-size: 24px;"
+                        + "-fx-font-weight: bold;"
+        );
+
         Label labelUsuario =
                 new Label("Usuário");
 
@@ -187,6 +193,22 @@ public class CadastroView {
                         mensagemStatus,
                         botaoVoltar
                 );
+
+        layout.setStyle(
+                "-fx-background-color: #f4f7fb;"
+        );
+
+        botaoCadastrar.setStyle(
+                "-fx-background-color: #176b87;"
+                        + "-fx-text-fill: white;"
+                        + "-fx-font-weight: bold;"
+                        + "-fx-padding: 10 18;"
+        );
+
+        botaoVoltar.setStyle(
+                "-fx-background-color: transparent;"
+                        + "-fx-text-fill: #176b87;"
+        );
 
         layout.setPadding(
                 new Insets(30)
