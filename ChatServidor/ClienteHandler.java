@@ -439,6 +439,22 @@ public class ClienteHandler implements Runnable {
             return;
         }
 
+        if (
+                mensagem.startsWith(
+                        "PUBLIC_KEY_REQUEST|"
+                )
+        ) {
+
+            processarPedidoChavePublica(
+                    mensagem.split(
+                            "\\|",
+                            2
+                    )
+            );
+
+            return;
+        }
+
         String[] partes =
                 mensagem.split(
                         "\\|",
@@ -482,11 +498,152 @@ public class ClienteHandler implements Runnable {
                 processarParadaDigitacao(partes);
                 break;
 
+                        case "E2EE_HELLO":
+                        case "E2EE_HELLO_RESPONSE":
+                        case "E2EE_AUTH_CHALLENGE":
+                        case "E2EE_AUTH_RESPONSE":
+                                processarControleE2EE(partes);
+                                break;
+
             default:
                 enviarMensagem(
                         "ERRO|Comando desconhecido"
                 );
         }
+    }
+
+    private void processarPedidoChavePublica(
+            String[] partes
+    ) {
+
+        if (
+                partes.length < 2
+                        || nomeUsuario == null
+        ) {
+
+            enviarMensagem(
+                    "E2EE_ERROR|Pedido de chave inválido"
+            );
+
+            return;
+        }
+
+        String contato =
+                partes[1].trim();
+
+        System.out.println(
+                "E2EE: "
+                        + nomeUsuario
+                        + " solicitou a chave pública de "
+                        + contato
+        );
+
+        String chavePublicaContato =
+                gerenciadorUsuariosBanco
+                        .obterChavePublica(
+                                contato
+                        );
+
+        if (
+                chavePublicaContato == null
+                        || chavePublicaContato.trim().isEmpty()
+        ) {
+
+            enviarMensagem(
+                    "E2EE_ERROR|Chave pública do contato não encontrada"
+            );
+
+            return;
+        }
+
+        enviarMensagem(
+                "PUBLIC_KEY|"
+                        + contato
+                        + "|"
+                        + chavePublicaContato
+        );
+
+        ClienteHandler clienteContato =
+                gerenciador.encontrarCliente(
+                        contato
+                );
+
+        if (clienteContato != null) {
+
+            String chavePublicaSolicitante =
+                    gerenciadorUsuariosBanco
+                            .obterChavePublica(
+                                    nomeUsuario
+                            );
+
+            clienteContato.enviarMensagem(
+                    "KEY_REQUESTED|"
+                            + nomeUsuario
+                            + "|"
+                            + chavePublicaSolicitante
+            );
+        }
+    }
+
+    private void processarControleE2EE(
+            String[] partes
+    ) {
+
+        if (
+                partes.length < 2
+                        || nomeUsuario == null
+        ) {
+
+            return;
+        }
+
+        String destinatario =
+                partes[1].trim();
+
+        ClienteHandler clienteDestino =
+                gerenciador.encontrarCliente(
+                        destinatario
+                );
+
+        System.out.println(
+                "E2EE: roteando "
+                        + partes[0]
+                        + " de "
+                        + nomeUsuario
+                        + " para "
+                        + destinatario
+        );
+
+        if (clienteDestino == null) {
+
+            enviarMensagem(
+                    "E2EE_ERROR|Contato offline"
+            );
+
+            return;
+        }
+
+        StringBuilder encaminhada =
+                new StringBuilder(
+                        "E2EE_ROUTE|"
+                                + nomeUsuario
+                );
+
+        encaminhada.append("|");
+
+        encaminhada.append(
+                partes[0]
+        );
+
+        for (int indice = 2; indice < partes.length; indice++) {
+
+            encaminhada.append("|");
+            encaminhada.append(partes[indice]);
+        }
+
+        clienteDestino.enviarMensagem(
+                encaminhada.toString()
+        );
     }
 
     private void processarLoginNovoDispositivo(
@@ -569,6 +726,10 @@ public class ClienteHandler implements Runnable {
             return;
         }
 
+        notificarMudancaChavePublica(
+                nome
+        );
+
         limparMensagensOffline(
                 nome
         );
@@ -577,6 +738,26 @@ public class ClienteHandler implements Runnable {
                 nome
         );
     }
+
+        private void notificarMudancaChavePublica(
+                        String nome
+        ) {
+
+                for (ClienteHandler cliente :
+                                gerenciador.getClientes()) {
+
+                        if (
+                                        cliente != this
+                                                        && cliente.getNomeUsuario() != null
+                        ) {
+
+                                cliente.enviarMensagem(
+                                                "PUBLIC_KEY_CHANGED|"
+                                                                + nome
+                                );
+                        }
+                }
+        }
 
     private void limparMensagensOffline(
             String nome
