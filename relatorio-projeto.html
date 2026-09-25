@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Relatorio do projeto Chat</title>
+<style>
+body { font-family: Arial, sans-serif; color: #24313a; margin: 48px; line-height: 1.45; }
+h1 { color: #155e75; border-bottom: 2px solid #155e75; padding-bottom: 8px; }
+h2 { color: #155e75; margin-top: 26px; }
+li { margin: 5px 0; }
+.note { background: #eef4f5; border-left: 4px solid #155e75; padding: 12px; }
+</style>
+</head>
+<body>
+<h1>Relatorio do projeto Chat</h1>
+<h2>Progresso atual</h2>
+<p><strong>Estimativa: 85% dos requisitos dos Projetos 1 e 2 implementados.</strong></p>
+<p>A implementacao esta avancada, mas ainda falta executar os testes de integracao com servidor e duas instancias do cliente.</p>
+<h2>Trabalho realizado</h2>
+<ol>
+<li>Revisao do codigo e comparacao com os PDFs.</li>
+<li>DH efemero, HKDF-SHA-256, AES-256 e HMAC-SHA-256.</li>
+<li>Senhas com Argon2 e autenticacao com chaves Ed25519.</li>
+<li>Login de novo dispositivo, troca de chave e descarte de mensagens offline.</li>
+<li>Sessoes E2EE por contato, handshake e autenticacao mutua.</li>
+<li>Mensagens online e offline protegidas por duas camadas.</li>
+<li>Renovacao da sessao apos limite de tempo ou mensagens.</li>
+<li>Historico local cifrado com AES-GCM.</li>
+<li>Persistencia local da chave privada Ed25519 cifrada com a senha.</li>
+<li>Correcao do indicador de digitacao e timeout de dois segundos.</li>
+<li>Remocao do cliente de terminal legado inseguro.</li>
+<li>Documentacao da arquitetura e execucao no README.</li>
+</ol>
+<h2>Clientes antigos</h2>
+<div class="note">Clientes cadastrados antes da persistencia local da chave privada precisam usar uma vez a opcao <strong>Entrar em novo dispositivo</strong>. A chave privada antiga nao pode ser recuperada do servidor.</div>
+<h2>Pendencias</h2>
+<ul>
+<li>Testar duas instancias do cliente com o servidor.</li>
+<li>Testar mensagens online, offline e renovacao de sessao.</li>
+<li>Reiniciar o cliente e confirmar o historico cifrado.</li>
+<li>Revisar issues, labels, commits com Ref e merge na main.</li>
+</ul>
+<h2>Proximo passo</h2>
+<p>Executar o servidor, abrir dois clientes, testar o handshake E2EE, enviar mensagens, desconectar um cliente, testar a fila offline e reiniciar o cliente para confirmar o historico cifrado.</p>
+</body>
+</html>
