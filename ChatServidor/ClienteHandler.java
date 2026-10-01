@@ -129,6 +129,7 @@ public class ClienteHandler implements Runnable {
 
         } finally {
 
+                        // [27] Remove o cliente desconectado e anuncia OFFLINE aos demais usuários.
             gerenciador.removerCliente(
                     this
             );
@@ -243,6 +244,7 @@ public class ClienteHandler implements Runnable {
 
         try {
 
+                        // [05] Deriva as chaves correspondentes às do cliente usando DH e o salt recebido.
             /*
              * O servidor gera seu par DH.
              */
@@ -525,6 +527,7 @@ public class ClienteHandler implements Runnable {
             String[] partes
     ) {
 
+        // [26] Responde ao novo DH e substitui as chaves AES/HMAC do canal.
         if (partes.length < 3) {
             return;
         }
@@ -577,6 +580,7 @@ public class ClienteHandler implements Runnable {
             String[] partes
     ) {
 
+        // [17] Consulta a chave pública do contato e a entrega para iniciar o handshake E2EE.
         if (
                 partes.length < 2
                         || nomeUsuario == null
@@ -650,6 +654,7 @@ public class ClienteHandler implements Runnable {
             String[] partes
     ) {
 
+        // [18] Apenas encaminha mensagens de handshake/autenticação entre os dois clientes.
         if (
                 partes.length < 2
                         || nomeUsuario == null
@@ -742,6 +747,7 @@ public class ClienteHandler implements Runnable {
             return;
         }
 
+        // [13] Confere a senha; em sucesso troca a chave pública e descarta mensagens offline antigas.
         boolean autenticado =
                 gerenciadorUsuariosBanco
                         .autenticar(
@@ -891,6 +897,7 @@ public class ClienteHandler implements Runnable {
             return;
         }
 
+        // [07] Encaminha cadastro validado ao banco para criação da conta e associação da chave pública.
         boolean cadastrado =
                 gerenciadorUsuariosBanco
                         .cadastrarUsuario(
@@ -1005,6 +1012,7 @@ public class ClienteHandler implements Runnable {
             String nome
     ) {
 
+        // [12] Cria nonce aleatório e de uso único para autenticar o dispositivo conhecido.
         /*
          * O usuário precisa existir e possuir
          * uma chave pública cadastrada.
@@ -1130,6 +1138,7 @@ public class ClienteHandler implements Runnable {
                                     chavePublicaBase64
                             );
 
+            // [12] Verifica a assinatura com a chave pública cadastrada antes de aceitar o login.
             boolean assinaturaValida =
                     gerenciadorAssinatura.verificar(
                             nonceLogin,
@@ -1220,6 +1229,7 @@ public class ClienteHandler implements Runnable {
                         + nomeUsuario
         );
 
+        // [14] Registra presença, publica usuários online e entrega mensagens offline pendentes.
         gerenciador.adicionarCliente(
                 this
         );
@@ -1453,6 +1463,7 @@ public class ClienteHandler implements Runnable {
             return;
         }
 
+        // [20] Persiste o payload E2EE opaco e entrega ao contato online ou mantém na fila offline.
         int idMensagem =
                 salvarMensagem(
                         nomeUsuario,
@@ -1672,6 +1683,7 @@ public class ClienteHandler implements Runnable {
             return;
         }
 
+        // [23] Busca o histórico do par; o conteúdo continua cifrado E2EE durante o retorno.
         String sql =
                 """
                 SELECT
@@ -1847,6 +1859,7 @@ public class ClienteHandler implements Runnable {
             return;
         }
 
+        // [24] Marca como apagada somente a cópia visível para quem fez a solicitação.
         String sql =
                 """
                 UPDATE mensagens
@@ -2106,6 +2119,7 @@ public class ClienteHandler implements Runnable {
         String destinatario =
                 partes[1];
 
+        // [25] Repassa a notificação ao contato caso ele esteja conectado.
         ClienteHandler clienteDestino =
                 gerenciador.encontrarCliente(
                         destinatario

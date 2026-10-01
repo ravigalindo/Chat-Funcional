@@ -75,6 +75,7 @@ public class CadastroView {
 
         botaoCadastrar.setOnAction(event -> {
 
+                        // [04] Valida os campos localmente antes de abrir uma conexão de cadastro.
             String usuario =
                     campoUsuario
                             .getText()
@@ -140,6 +141,7 @@ public class CadastroView {
                             )
             ) {
 
+                // [10] Exibe o resultado e encerra a conexão usada somente pelo cadastro.
                 mensagemStatus.setText(
                         "Cadastro realizado com sucesso!"
                 );

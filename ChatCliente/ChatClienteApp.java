@@ -96,6 +96,7 @@ public class ChatClienteApp
     @Override
     public void start(Stage stage) {
 
+        // [02] Abre a tela inicial com as opções de login, cadastro e novo dispositivo.
         LoginView loginView =
                 new LoginView(
                         stage,
@@ -144,6 +145,7 @@ public class ChatClienteApp
          *
          * MESSAGE|id|remetente|conteudo
          */
+        // [22] Trata mensagens recebidas, atualizando conversa, histórico e indicadores de leitura.
         if (mensagem.startsWith("MESSAGE|")) {
 
             String[] partes =
@@ -355,6 +357,7 @@ public class ChatClienteApp
             return;
         }
 
+        // [23] Acrescenta ao histórico local as mensagens buscadas no banco do servidor.
         if (mensagem.startsWith("HISTORY_MESSAGE|")) {
 
             String[] partes =
@@ -774,6 +777,7 @@ public class ChatClienteApp
 
     public void mostrarChat(Stage stage) {
 
+                // [15] Após o LOGIN_OK, deriva a chave local e carrega o histórico criptografado.
         Usuario usuarioLogado =
                 sessao.getUsuarioLogado();
 
@@ -853,6 +857,7 @@ public class ChatClienteApp
                 return;
             }
 
+                        // [25] Notifica o contato enquanto o usuário digita.
             clienteTCP.enviarDigitacao(
                     contatoAtual
             );
@@ -900,6 +905,7 @@ public class ChatClienteApp
                 javafx.scene.layout.Priority.ALWAYS
         );
 
+        // [16] Selecionar contato abre o cache, busca histórico se necessário e sinaliza leitura.
         listaContatos.setOnMouseClicked(event -> {
 
             String contatoSelecionado =
@@ -1102,6 +1108,7 @@ public class ChatClienteApp
                         Stage stage
         ) {
 
+                        // [27] Fecha a conexão e limpa o estado antes de retornar à tela de login.
                 if (timerDigitacao != null) {
                         timerDigitacao.cancel();
                         timerDigitacao = null;
@@ -1648,6 +1655,7 @@ public class ChatClienteApp
          * somente quando o servidor devolver
          * o ID real.
          */
+        // [19] Encaminha o texto para cifragem E2EE; a tela espera o ID real do servidor.
         clienteTCP.enviarMensagem(
                 contatoAtual,
                 texto

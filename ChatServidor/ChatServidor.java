@@ -14,6 +14,7 @@ public class ChatServidor {
                 "Iniciando servidor..."
         );
 
+        // [01] Inicializa banco e tabelas antes de aceitar conexões dos clientes.
         /*
          * Garante que o banco e as tabelas
          * existam antes de aceitar clientes.

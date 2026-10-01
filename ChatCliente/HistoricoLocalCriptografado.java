@@ -41,6 +41,7 @@ public class HistoricoLocalCriptografado {
             String senha
     ) {
 
+                // [15] Prepara o arquivo por usuário e deriva a chave AES a partir da senha e de um salt.
         try {
             Files.createDirectories(DIRETORIO);
 
@@ -125,6 +126,7 @@ public class HistoricoLocalCriptografado {
             Map<String, List<Mensagem>> historico
     ) {
 
+                // [22] Criptografa o histórico completo com AES-GCM antes de gravá-lo no disco.
         StringBuilder texto =
                 new StringBuilder();
 

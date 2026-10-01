@@ -1,0 +1,67 @@
+ORDEM DOS COMENTARIOS NUMERADOS DO CHAT
+========================================
+
+01. O servidor prepara o banco e as tabelas, abre a porta TCP e aguarda clientes.
+02. O cliente inicia a aplicacao e mostra a tela com login, cadastro e novo dispositivo.
+03. Ao escolher Criar uma conta, o cliente abre o formulario de cadastro.
+04. O formulario verifica usuario, senha e confirmacao antes de conectar.
+05. Cliente e servidor abrem TCP e fazem o handshake Diffie-Hellman/HKDF. A partir dai, os comandos trafegam no canal protegido.
+06. No cadastro, o cliente gera o par Ed25519 e envia usuario, senha e chave publica. A chave privada permanece no cliente.
+07. O servidor valida os dados recebidos e encaminha o cadastro ao gerenciador do banco.
+08. O banco grava usuario, hash Argon2 da senha e chave publica; o nome precisa ser unico.
+09. Com REGISTER_OK, o cliente salva localmente a chave privada para futuros logins conhecidos.
+10. A tela mostra o resultado e fecha a conexao exclusiva do cadastro. O usuario pode voltar ao login.
+11. No login de dispositivo conhecido, o cliente carrega a chave privada local e envia somente o nome de usuario. A senha nao e enviada nessa rota.
+12. O servidor gera um nonce; o cliente o assina com Ed25519; o servidor verifica a assinatura com a chave publica cadastrada. O desafio e descartado e nao pode ser reutilizado.
+13. ROTA ALTERNATIVA - novo dispositivo: o cliente gera outro par Ed25519 e envia usuario, senha e chave publica pelo canal protegido. O servidor verifica a senha, troca a chave publica, avisa os clientes conectados e remove mensagens offline ainda nao entregues.
+14. Depois de autenticar qualquer uma das rotas, o servidor impede login duplicado, registra o usuario online, envia LOGIN_OK e listas de usuarios/presenca, avisa os demais e tenta entregar mensagens offline pendentes.
+15. Ao receber LOGIN_OK, o cliente inicia a thread de recebimento, cria a sessao local e abre o chat. O arquivo de historico do usuario e carregado com criptografia local.
+16. Ao selecionar um contato, o cliente abre a conversa, zera o contador de nao lidas e envia READ. Se nao houver historico local para exibir, solicita o historico remoto.
+17. Ao precisar enviar para um contato sem sessao E2EE autenticada, os clientes trocam chaves publicas e negociam chaves efemeras por Diffie-Hellman, derivadas para aquela conversa.
+18. Os clientes autenticam um ao outro com desafios assinados por Ed25519. Depois da autenticacao, mensagens que estavam aguardando o handshake podem ser enviadas.
+19. O cliente cifra o texto com a sessao E2EE antes de enviar. Se o handshake ainda nao terminou, o texto fica pendente; a interface aguarda o ID real devolvido pelo servidor para exibir a mensagem.
+20. O canal externo cifra cada comando com AES-GCM e calcula HMAC. O servidor valida e remove essa camada, grava o payload E2EE e o encaminha ao contato online ou o mantem para entrega offline.
+21. No recebimento, o cliente valida o HMAC, remove a camada AES-GCM e tenta decifrar o payload E2EE antes de entregar o evento a interface.
+22. A interface incorpora a mensagem a conversa e ao historico local criptografado. Se a conversa nao estiver aberta, incrementa o contador de nao lidas; quando estiver aberta, envia READ. O servidor marca a mensagem como lida e avisa o remetente.
+23. RAMO DE HISTORICO REMOTO - quando solicitado, o servidor consulta as mensagens do par e envia HISTORY_MESSAGE seguido de HISTORY_END. O cliente tenta decifrar, evita duplicatas, atualiza a conversa e salva o resultado localmente.
+24. Ao apagar para mim, o servidor confirma que o usuario participa da conversa e marca apenas a copia dele como apagada. O cliente remove a mensagem da memoria, da tela e do arquivo local.
+25. Enquanto alguem digita, o cliente envia TYPING; ao parar (ou apos o temporizador), envia STOP_TYPING. O servidor repassa os avisos se o contato estiver online.
+26. Quando o canal atinge o limite de uso, cliente e servidor fazem novo Diffie-Hellman e trocam as chaves AES/HMAC. Comandos aguardam a renovacao e depois sao reenviados.
+27. Ao sair, o cliente fecha a conexao e limpa o estado local da sessao. O servidor remove o cliente e anuncia que ele ficou offline.
+
+Observacoes:
+- Os numeros identificam etapas do fluxo e aparecem em comentarios nos arquivos Java; nao representam a ordem fisica dos arquivos.
+- Os passos 11 e 13 sao alternativas: login de dispositivo conhecido ou autenticacao de novo dispositivo.
+- Os passos 16, 23, 24 e 25 sao ramos opcionais da conversa; o 26 ocorre automaticamente quando necessario.
+- A cifragem E2EE protege o conteudo entre os contatos; AES-GCM/HMAC protege o canal cliente-servidor.
+
+LOCALIZACAO DOS COMENTARIOS NO CODIGO
+=====================================
+
+01. ChatServidor/ChatServidor.java:17
+02. ChatCliente/ChatClienteApp.java:99
+03. ChatCliente/LoginView.java:173
+04. ChatCliente/CadastroView.java:78
+05. ChatCliente/ClienteTCP.java:117; ChatServidor/ClienteHandler.java:247
+06. ChatCliente/ClienteTCP.java:268
+07. ChatServidor/ClienteHandler.java:900
+08. ChatServidor/GerenciadorUsuariosBanco.java:35
+09. ChatCliente/ClienteTCP.java:306
+10. ChatCliente/CadastroView.java:144
+11. ChatCliente/LoginView.java:102; ChatCliente/ClienteTCP.java:357
+12. ChatServidor/ClienteHandler.java:1015, 1141; ChatCliente/ClienteTCP.java:397
+13. ChatCliente/LoginView.java:153; ChatCliente/ClienteTCP.java:429; ChatServidor/ClienteHandler.java:750
+14. ChatServidor/ClienteHandler.java:1232
+15. ChatCliente/LoginView.java:261; ChatCliente/ChatClienteApp.java:780; ChatCliente/HistoricoLocalCriptografado.java:44
+16. ChatCliente/ChatClienteApp.java:908; ChatCliente/ClienteTCP.java:1520
+17. ChatCliente/ClienteTCP.java:1466; ChatServidor/ClienteHandler.java:583
+18. ChatCliente/ClienteTCP.java:830; ChatServidor/ClienteHandler.java:657
+19. ChatCliente/ChatClienteApp.java:1658; ChatCliente/ClienteTCP.java:1429
+20. ChatCliente/ClienteTCP.java:494; ChatServidor/ClienteHandler.java:1466
+21. ChatCliente/ClienteTCP.java:1307
+22. ChatCliente/ChatClienteApp.java:148; ChatCliente/HistoricoLocalCriptografado.java:129
+23. ChatCliente/ChatClienteApp.java:360; ChatServidor/ClienteHandler.java:1686
+24. ChatCliente/ClienteTCP.java:1549; ChatServidor/ClienteHandler.java:1862
+25. ChatCliente/ChatClienteApp.java:860; ChatCliente/ClienteTCP.java:1564; ChatServidor/ClienteHandler.java:2122
+26. ChatCliente/ClienteTCP.java:543; ChatServidor/ClienteHandler.java:530
+27. ChatCliente/ChatClienteApp.java:1111; ChatServidor/ClienteHandler.java:132

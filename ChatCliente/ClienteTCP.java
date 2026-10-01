@@ -114,6 +114,7 @@ public class ClienteTCP {
 
         try {
 
+                        // [05] Abre TCP e conclui Diffie-Hellman/HKDF antes dos comandos da aplicação.
             socket =
                     new Socket(
                             HOST,
@@ -264,6 +265,7 @@ public class ClienteTCP {
             return null;
         }
 
+                // [06] Gera a identidade Ed25519 e envia o cadastro pelo canal protegido.
         /*
          * Gera o par de chaves assimétricas
          * do usuário.
@@ -301,6 +303,7 @@ public class ClienteTCP {
         );
 
         if ("REGISTER_OK".equals(resposta)) {
+                        // [09] Só persiste a chave privada local depois da confirmação do servidor.
             chaveAssinaturaLocal.salvar(
                     nomeUsuario,
                     senha,
@@ -351,6 +354,7 @@ public class ClienteTCP {
             return "LOGIN_ERROR|Chave privada não disponível.";
         }
 
+        // [11] Envia somente o usuário; o login de dispositivo conhecido não envia a senha.
         enviarMensagemSegura(
                 "LOGIN|"
                         + nomeUsuario
@@ -390,6 +394,7 @@ public class ClienteTCP {
             String nonce =
                     partes[1];
 
+            // [12] Assina o nonce com Ed25519 e devolve a prova de posse da chave privada.
             String assinatura =
                     gerenciadorAssinatura.assinar(
                             nonce,
@@ -421,6 +426,7 @@ public class ClienteTCP {
         return null;
     }
 
+        // [13] Gera nova identidade; senha e chave pública seguem pelo canal protegido.
     /*
      * Um novo dispositivo precisa gerar
      * um novo par de chaves Ed25519.
@@ -485,6 +491,7 @@ public class ClienteTCP {
             return;
         }
 
+                // [20] Aplica AES-GCM e HMAC a cada comando no canal cliente-servidor.
                 boolean comandoRenovacao =
                                 mensagem.startsWith("REKEY_REQUEST|")
                                                 || mensagem.startsWith("REKEY_RESPONSE|");
@@ -533,6 +540,7 @@ public class ClienteTCP {
             return;
         }
 
+                // [26] Renova as chaves do canal com novo DH quando o limite de uso é atingido.
         parDHRenovacao =
                 handshakeCliente.gerarParDH();
 
@@ -819,6 +827,7 @@ public class ClienteTCP {
             return false;
         }
 
+                // [18] Responde e verifica desafios Ed25519 para autenticar mutuamente os contatos.
         String[] partes =
                 mensagem.split("\\|", 5);
 
@@ -1295,6 +1304,7 @@ public class ClienteTCP {
                                         != null
                         ) {
 
+                                                        // [21] Valida/remove o canal externo e tenta decifrar o payload E2EE recebido.
                             String mensagemProcessada =
                                     processarMensagemSegura(
                                             mensagem
@@ -1416,6 +1426,7 @@ public class ClienteTCP {
             return;
         }
 
+                // [19] Cifra o conteúdo com a sessão E2EE autenticada antes de proteger o canal externo.
         String mensagemCifrada =
                 sessaoE2EE.criptografar(
                         conteudo
@@ -1452,6 +1463,7 @@ public class ClienteTCP {
             String contato
     ) {
 
+                // [17] Obtém a chave pública do contato e negocia uma sessão efêmera por conversa.
         PublicKey chavePublica =
                 chavesPublicasContatos.get(
                         contato
@@ -1505,6 +1517,7 @@ public class ClienteTCP {
             return;
         }
 
+                // [16] Busca no servidor quando o contato não tem histórico local disponível.
         enviarMensagemSegura(
                 "HISTORY|"
                         + usuario
@@ -1533,6 +1546,7 @@ public class ClienteTCP {
             return;
         }
 
+                // [24] Solicita exclusão lógica da mensagem para a conta autenticada.
         enviarMensagemSegura(
                 "DELETE_MESSAGE|"
                         + id
@@ -1547,6 +1561,7 @@ public class ClienteTCP {
             return;
         }
 
+                // [25] Encaminha a notificação de digitação pelo canal protegido.
         enviarMensagemSegura(
                 "TYPING|"
                         + destinatario

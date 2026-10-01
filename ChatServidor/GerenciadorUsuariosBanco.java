@@ -32,6 +32,7 @@ public class GerenciadorUsuariosBanco {
             String chavePublica
     ) {
 
+                // [08] Grava hash Argon2, nome único e chave pública, nunca a senha em texto puro.
         String senhaHash =
                 gerenciadorSenhas.gerarHash(
                         senha

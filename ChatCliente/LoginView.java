@@ -99,6 +99,7 @@ public class LoginView {
                 return;
             }
 
+            // [11] No dispositivo conhecido, inicia login com chave privada local e desafio do servidor.
             String resposta =
                     clienteTCP.fazerLogin(
                             usuario,
@@ -149,6 +150,7 @@ public class LoginView {
                 return;
             }
 
+            // [13] Alternativa: autentica com senha protegida e registra a chave deste dispositivo.
             String resposta =
                     clienteTCP.fazerLoginNovoDispositivo(
                             usuario,
@@ -168,6 +170,7 @@ public class LoginView {
 
         botaoCadastro.setOnAction(event -> {
 
+                        // [03] Abre o formulário de cadastro sem iniciar uma sessão autenticada.
             CadastroView cadastroView =
                     new CadastroView(
                             stage,
@@ -255,6 +258,7 @@ public class LoginView {
                         )
         ) {
 
+            // [15] Inicia a sessão local, a recepção assíncrona e a interface do chat.
             Usuario usuarioAutenticado =
                     new Usuario(
                             nomeUsuario,
